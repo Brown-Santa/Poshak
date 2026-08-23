@@ -229,7 +229,15 @@ function removeCart(id){cart=cart.filter(x=>x.id!==id);renderCart()}
 async function completeSale(){
  if(!cart.length){toast('Add at least one item');return}
  const btn=document.getElementById('completeBill');btn.disabled=true;
+ // Open the print window immediately from the user's click so browser popup blockers
+ // do not prevent automatic receipt printing after the async database work finishes.
+ let autoPrintWindow=null;
  try{
+  autoPrintWindow=window.open('', '_blank', 'width=420,height=700');
+  if(autoPrintWindow){
+   autoPrintWindow.document.write('<!doctype html><html><head><title>POSHAK</title></head><body style="font-family:Arial,sans-serif;text-align:center;padding:30px"><h2>POSHAK</h2><p>Preparing bill...</p></body></html>');
+   autoPrintWindow.document.close();
+  }
   const billNumber='POS-'+new Date().toISOString().slice(0,10).replaceAll('-','')+'-'+String(Date.now()).slice(-6);
   let subtotal=0;const items=[];
   for(const c of cart){const v=variants.find(x=>x.id===c.id);if(!v||c.qty>v.stock_quantity)throw Error('Stock changed for an item. Refresh and try again.');const line=Number(v.selling_price)*c.qty;subtotal+=line;items.push({v,c,line})}
@@ -242,7 +250,17 @@ async function completeSale(){
    await db.from('inventory_movements').insert({variant_id:v.id,movement_type:'sale',quantity:-x.c.qty,reference_id:r.data.id,notes:`Bill ${billNumber}`});
   }
   toast(`Bill ${billNumber} completed`);cart=[];document.getElementById('customerPhone').value='';await loadData();renderCart();
- }catch(err){console.error(err);toast(err.message||'Could not complete bill')}finally{btn.disabled=false}
+  // Print immediately after the bill has been committed and the fresh sales cache is loaded.
+  if(autoPrintWindow){
+   printBill(r.data.id, autoPrintWindow);
+  } else {
+   toast('Bill saved. Browser blocked automatic printing; use Sales → Print.');
+  }
+ }catch(err){
+  console.error(err);
+  if(autoPrintWindow && !autoPrintWindow.closed) autoPrintWindow.close();
+  toast(err.message||'Could not complete bill');
+ }finally{btn.disabled=false}
 }
 async function generateBarcode(id){
  const v=variants.find(x=>x.id===id);if(!v)return;
@@ -359,11 +377,11 @@ function renderDuffers(rows){
 
 function toggleSaleDetails(id){const row=document.getElementById('sale-detail-'+id);if(row)row.style.display=row.style.display==='none'?'table-row':'none'}
 
-function printBill(id){
+function printBill(id, existingWindow=null){
  const b=salesCache.find(x=>x.id===id);if(!b)return;
  selectedBillId=id;document.getElementById('printSelectedBillBtn').disabled=false;
  const items=b.bill_items||[];
- const w=window.open('','_blank','width=420,height=700');
+ const w=existingWindow || window.open('','_blank','width=420,height=700');
  if(!w){toast('Allow pop-ups to print the bill');return}
  const rows=items.map(i=>`<tr><td>${esc(i.product_name)}<div class="muted">${esc([i.size,i.colour].filter(Boolean).join(' / '))}</div></td><td class="r">${i.quantity}</td><td class="r">${money(i.selling_price)}</td><td class="r">${money(i.line_total)}</td></tr>`).join('');
  w.document.write(`<!doctype html><html><head><title>${esc(b.bill_number)}</title><style>@page{size:80mm auto;margin:4mm}body{font-family:Arial,sans-serif;width:72mm;margin:0 auto;color:#111;font-size:11px}.center{text-align:center}.logo{width:42mm;height:42mm;object-fit:contain;margin:auto}.brand{font-size:20px;font-weight:800;letter-spacing:2px}.muted{color:#666;font-size:9px;margin-top:2px}h2{font-size:14px;margin:7px 0}.line{border-top:1px dashed #555;margin:7px 0}table{width:100%;border-collapse:collapse}th,td{padding:4px 0;vertical-align:top}th{font-size:9px;border-bottom:1px solid #222}.r{text-align:right}.total{font-size:16px;font-weight:800;text-align:right;margin-top:7px}.foot{text-align:center;margin-top:12px;font-size:9px}@media print{button{display:none}}</style></head><body><div class="center"><img class="logo" src="${location.origin}/poshak-logo.jpeg"><div class="brand">POSHAK</div><div>MEN'S WEAR</div></div><div class="line"></div><div><b>Bill:</b> ${esc(b.bill_number)}<br><b>Date:</b> ${new Date(b.created_at).toLocaleString('en-IN')}<br><b>Payment:</b> ${esc(b.payment_method.toUpperCase())}</div><div class="line"></div><table><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Rate</th><th class="r">Amt</th></tr></thead><tbody>${rows}</tbody></table><div class="line"></div><div class="total">TOTAL ${money(b.total)}</div><div class="foot">Thank you for shopping with POSHAK<br>Visit again!</div><script>window.onload=()=>{window.print();setTimeout(()=>window.close(),700)}<\/script></body></html>`);
