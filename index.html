@@ -149,7 +149,7 @@ async function loadData(){
  ]);
  if(pr.error||vr.error){console.error(pr.error||vr.error);toast('Database connection error');return}
  products=pr.data||[];variants=vr.data||[];
- loadDashboard();renderProducts();renderInventory();renderBillMatches();renderSales();
+ loadDashboard();renderProducts();renderInventory();renderBillMatches();await renderSales();
 }
 async function loadDashboard(){
  document.getElementById('today').textContent=new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
@@ -252,7 +252,7 @@ async function completeSale(){
   toast(`Bill ${billNumber} completed`);cart=[];document.getElementById('customerPhone').value='';await loadData();renderCart();
   // Print immediately after the bill has been committed and the fresh sales cache is loaded.
   if(autoPrintWindow){
-   printBill(r.data.id, autoPrintWindow);
+   await printBill(r.data.id, autoPrintWindow);
   } else {
    toast('Bill saved. Browser blocked automatic printing; use Sales → Print.');
   }
@@ -377,8 +377,13 @@ function renderDuffers(rows){
 
 function toggleSaleDetails(id){const row=document.getElementById('sale-detail-'+id);if(row)row.style.display=row.style.display==='none'?'table-row':'none'}
 
-function printBill(id, existingWindow=null){
- const b=salesCache.find(x=>x.id===id);if(!b)return;
+async function printBill(id, existingWindow=null){
+ let b=salesCache.find(x=>x.id===id);
+ if(!b){
+   const r=await db.from('bills').select('id,bill_number,created_at,payment_method,total,status,bill_items(quantity,product_name,size,colour,sku,barcode,selling_price,line_total)').eq('id',id).single();
+   if(r.error||!r.data){toast('Could not load bill for printing');if(existingWindow&&!existingWindow.closed)existingWindow.close();return;}
+   b=r.data;
+ }
  selectedBillId=id;document.getElementById('printSelectedBillBtn').disabled=false;
  const items=b.bill_items||[];
  const w=existingWindow || window.open('','_blank','width=420,height=700');
