@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>POSHAK — Retail Management</title>
+<style>
+:root{--ink:#17151d;--muted:#6d6875;--line:#e9e6ee;--bg:#f7f6f9;--card:#fff;--accent:#6d28d9;--accent2:#8b5cf6;--danger:#dc2626;--ok:#15803d;--shadow:0 8px 30px rgba(30,20,50,.07)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px Inter,system-ui,-apple-system,Segoe UI,sans-serif}
+button,input,select{font:inherit}button{cursor:pointer}.app{display:flex;min-height:100vh}.side{width:235px;background:#17131f;color:#fff;padding:22px 14px;position:fixed;inset:0 auto 0 0}.brand{font-size:24px;font-weight:800;letter-spacing:.08em;padding:8px 12px 26px}.brand small{display:block;font-size:9px;letter-spacing:.18em;color:#bdb4ca;margin-top:4px}.nav button{display:flex;width:100%;border:0;background:transparent;color:#cfc8d8;padding:12px 13px;border-radius:10px;text-align:left;gap:10px;margin:3px 0}.nav button.active,.nav button:hover{background:#2a2135;color:#fff}.main{margin-left:235px;padding:28px;max-width:1500px;width:calc(100% - 235px)}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}.top h1{margin:0;font-size:28px}.sub{color:var(--muted);margin-top:5px}.view{display:none}.view.active{display:block}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:15px}.card{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:18px;box-shadow:var(--shadow)}.metric{font-size:27px;font-weight:800;margin-top:8px}.label{color:var(--muted);font-size:12px}.toolbar{display:flex;gap:9px;align-items:center;margin:15px 0;flex-wrap:wrap}.btn{border:1px solid var(--line);background:#fff;padding:10px 14px;border-radius:9px}.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn.danger{color:var(--danger)}.input{border:1px solid #ddd8e4;background:#fff;border-radius:9px;padding:10px 11px;outline:none}.input:focus{border-color:var(--accent2);box-shadow:0 0 0 3px #ede9fe}.search{min-width:280px;flex:1}.tablewrap{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:auto}.table{width:100%;border-collapse:collapse}.table th,.table td{padding:12px 13px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}.table th{font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:.05em;background:#faf9fb}.pill{display:inline-flex;padding:4px 8px;border-radius:99px;background:#f0ebff;color:#5b21b6;font-size:11px}.low{color:var(--danger);font-weight:700}.modal{position:fixed;inset:0;background:rgba(16,12,22,.5);display:none;align-items:center;justify-content:center;padding:20px;z-index:20}.modal.open{display:flex}.modalbox{background:#fff;border-radius:17px;width:min(720px,100%);max-height:90vh;overflow:auto;padding:22px}.modalhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:5px}.field.full{grid-column:1/-1}.formactions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}.billgrid{display:grid;grid-template-columns:1.5fr 1fr;gap:16px}.productpick{display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:10px}.cartline{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line)}.total{font-size:24px;font-weight:800;text-align:right;margin-top:14px}.empty{text-align:center;color:var(--muted);padding:35px}.toast{position:fixed;right:20px;bottom:20px;background:#17131f;color:#fff;padding:12px 15px;border-radius:10px;display:none;z-index:30}.toast.show{display:block}@media(max-width:900px){.side{width:70px;padding:15px 8px}.brand{font-size:0;text-align:center}.brand:before{content:"P";font-size:24px}.brand small{display:none}.nav button span{display:none}.main{margin-left:70px;width:calc(100% - 70px);padding:18px}.grid{grid-template-columns:repeat(2,1fr)}.billgrid{grid-template-columns:1fr}.formgrid{grid-template-columns:1fr}}@media(max-width:560px){.grid{grid-template-columns:1fr 1fr}.top h1{font-size:22px}.search{min-width:160px}.main{padding:12px}.card{padding:13px}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="side"><div class="brand">POSHAK<small>RETAIL MANAGEMENT</small></div><nav class="nav">
+<button class="active" onclick="show('dashboard',this)">▦ <span>Dashboard</span></button>
+<button onclick="show('billing',this)">▤ <span>Billing</span></button>
+<button onclick="show('products',this)">◇ <span>Products</span></button>
+<button onclick="show('inventory',this)">▣ <span>Inventory</span></button>
+<button onclick="show('sales',this)">◷ <span>Sales</span></button>
+</nav></aside>
+<main class="main">
+<section id="dashboard" class="view active">
+<div class="top"><div><h1>Dashboard</h1><div class="sub" id="today"></div></div><button class="btn primary" onclick="showById('billing')">New Bill</button></div>
+<div class="grid">
+<div class="card"><div class="label">TODAY'S SALES</div><div class="metric" id="mSales">₹0</div></div>
+<div class="card"><div class="label">BILLS TODAY</div><div class="metric" id="mBills">0</div></div>
+<div class="card"><div class="label">PRODUCT VARIANTS</div><div class="metric" id="mProducts">0</div></div>
+<div class="card"><div class="label">LOW STOCK</div><div class="metric" id="mLow">0</div></div>
+</div>
+<div class="card" style="margin-top:16px"><h3>Low stock</h3><div id="lowList"></div></div>
+</section>
+
+<section id="products" class="view">
+<div class="top"><div><h1>Products</h1><div class="sub">Articles and variants</div></div><button class="btn primary" onclick="openProduct()">+ Add product</button></div>
+<div class="toolbar"><input class="input search" id="productSearch" placeholder="Search article, colour, size or barcode" oninput="renderProducts()"></div>
+<div class="tablewrap"><table class="table"><thead><tr><th>Article</th><th>Size</th><th>Colour</th><th>MRP</th><th>Discount</th><th>Sell</th><th>Stock</th><th>Barcode</th><th></th></tr></thead><tbody id="productRows"></tbody></table></div>
+</section>
+
+<section id="inventory" class="view">
+<div class="top"><div><h1>Inventory</h1><div class="sub">Current stock by variant</div></div></div>
+<div class="tablewrap"><table class="table"><thead><tr><th>Article</th><th>Size</th><th>Colour</th><th>Stock</th><th>Value</th><th>Action</th></tr></thead><tbody id="inventoryRows"></tbody></table></div>
+</section>
+
+<section id="billing" class="view">
+<div class="top"><div><h1>Billing</h1><div class="sub">Scan or search an article</div></div><button class="btn" onclick="clearCart()">Clear</button></div>
+<div class="billgrid"><div class="card"><div class="toolbar"><input class="input search" id="billSearch" placeholder="Search or enter barcode" oninput="renderBillMatches()"><button class="btn primary" onclick="focusBill()">Scan</button></div><div id="billMatches"></div></div>
+<div class="card"><h3>Current bill</h3><div id="cart"></div><div class="total" id="grand">₹0</div><div class="toolbar" style="justify-content:flex-end"><select class="input" id="payment"><option>Cash</option><option>UPI</option><option>Card</option></select><button class="btn primary" onclick="checkout()">Complete sale</button></div></div></div>
+</section>
+
+<section id="sales" class="view">
+<div class="top"><div><h1>Sales</h1><div class="sub">Completed transactions</div></div></div>
+<div class="tablewrap"><table class="table"><thead><tr><th>Bill</th><th>Date</th><th>Items</th><th>Payment</th><th>Total</th></tr></thead><tbody id="salesRows"></tbody></table></div>
+</section>
+</main></div>
+
+<div class="modal" id="productModal"><div class="modalbox"><div class="modalhead"><h2 id="modalTitle">Add product</h2><button class="btn" onclick="closeProduct()">✕</button></div>
+<form onsubmit="saveProduct(event)"><div class="formgrid">
+<div class="field full"><label>Article name *</label><input class="input" id="fName" required></div>
+<div class="field"><label>Size</label><input class="input" id="fSize" placeholder="e.g. M / 32"></div>
+<div class="field"><label>Colour</label><input class="input" id="fColor" placeholder="e.g. Blue"></div>
+<div class="field"><label>MRP *</label><input class="input" id="fMrp" type="number" min="0" step=".01" required></div>
+<div class="field"><label>Purchase price</label><input class="input" id="fBuy" type="number" min="0" step=".01"></div>
+<div class="field"><label>Discount %</label><input class="input" id="fDiscount" type="number" min="0" max="100" step=".01" value="0"></div>
+<div class="field"><label>Selling price</label><input class="input" id="fSell" type="number" min="0" step=".01"></div>
+<div class="field"><label>Opening stock</label><input class="input" id="fStock" type="number" min="0" step="1" value="0"></div>
+<div class="field full"><label>Barcode</label><input class="input" id="fBarcode" placeholder="Leave blank to generate"></div>
+</div><div class="formactions"><button type="button" class="btn" onclick="closeProduct()">Cancel</button><button class="btn primary">Save product</button></div></form></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const KEY='poshak_v1';
+let db=JSON.parse(localStorage.getItem(KEY)||'null')||{products:[
+{id:1,name:'Slim Fit Jeans',size:'32',color:'Dark Blue',mrp:1999,buy:900,discount:25,sell:1499,stock:8,barcode:'890000000001'},
+{id:2,name:'Cotton T-Shirt',size:'L',color:'Black',mrp:999,buy:400,discount:20,sell:799,stock:12,barcode:'890000000002'},
+{id:3,name:'Casual Shirt',size:'M',color:'White',mrp:1499,buy:650,discount:15,sell:1274,stock:5,barcode:'890000000003'}
+],sales:[]};
+let cart=[],editId=null;
+const money=n=>'₹'+Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:2});
+function save(){localStorage.setItem(KEY,JSON.stringify(db))}
+function show(id,btn){document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));if(btn)btn.classList.add('active');render()}
+function showById(id){let b=[...document.querySelectorAll('.nav button')].find(x=>x.textContent.toLowerCase().includes(id.slice(0,-1)));show(id,b)}
+function toast(t){let x=document.getElementById('toast');x.textContent=t;x.classList.add('show');setTimeout(()=>x.classList.remove('show'),1800)}
+function render(){renderDashboard();renderProducts();renderInventory();renderBillMatches();renderCart();renderSales()}
+document.getElementById('today').textContent=new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+function renderDashboard(){let d=new Date().toDateString(),s=db.sales.filter(x=>new Date(x.date).toDateString()===d);document.getElementById('mSales').textContent=money(s.reduce((a,x)=>a+x.total,0));document.getElementById('mBills').textContent=s.length;document.getElementById('mProducts').textContent=db.products.length;let low=db.products.filter(x=>x.stock<=3);document.getElementById('mLow').textContent=low.length;document.getElementById('lowList').innerHTML=low.length?low.map(x=>`<div style="padding:9px 0;border-bottom:1px solid var(--line)">${x.name} · ${x.color||'-'} · ${x.size||'-'} <span class="low" style="float:right">${x.stock} left</span></div>`).join(''):'<div class="empty">No low-stock variants.</div>'}
+function renderProducts(){let q=(document.getElementById('productSearch')?.value||'').toLowerCase();let p=db.products.filter(x=>[x.name,x.size,x.color,x.barcode].join(' ').toLowerCase().includes(q));document.getElementById('productRows').innerHTML=p.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.size||'-')}</td><td>${esc(x.color||'-')}</td><td>${money(x.mrp)}</td><td>${x.discount}%</td><td>${money(x.sell)}</td><td class="${x.stock<=3?'low':''}">${x.stock}</td><td>${x.barcode||'-'}</td><td><button class="btn" onclick="openProduct(${x.id})">Edit</button></td></tr>`).join('')}
+function renderInventory(){document.getElementById('inventoryRows').innerHTML=db.products.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.size||'-')}</td><td>${esc(x.color||'-')}</td><td class="${x.stock<=3?'low':''}">${x.stock}</td><td>${money(x.stock*x.buy)}</td><td><button class="btn" onclick="adjust(${x.id},1)">+ Stock</button> <button class="btn" onclick="adjust(${x.id},-1)">−</button></td></tr>`).join('')}
+function renderBillMatches(){let q=(document.getElementById('billSearch')?.value||'').toLowerCase().trim();let list=q?db.products.filter(x=>[x.name,x.size,x.color,x.barcode].join(' ').toLowerCase().includes(q)):db.products.slice(0,8);document.getElementById('billMatches').innerHTML=list.map(x=>`<div class="productpick"><div class="card" style="padding:11px"><b>${esc(x.name)}</b><div class="label">${esc(x.color||'')} ${esc(x.size||'')} · ${money(x.sell)} · ${x.stock} in stock</div></div><button class="btn primary" ${x.stock<1?'disabled':''} onclick="addCart(${x.id})">Add</button></div>`).join('')||'<div class="empty">No matching products.</div>'}
+function addCart(id){let p=db.products.find(x=>x.id===id);if(!p||p.stock<1)return toast('Out of stock');let c=cart.find(x=>x.id===id);if(c){if(c.qty>=p.stock)return toast('Not enough stock');c.qty++}else cart.push({id,qty:1});renderCart()}
+function renderCart(){let total=0;document.getElementById('cart').innerHTML=cart.length?cart.map(c=>{let p=db.products.find(x=>x.id===c.id),v=p.sell*c.qty;total+=v;return `<div class="cartline"><div><b>${esc(p.name)}</b><div class="label">${esc(p.color||'')} ${esc(p.size||'')}</div></div><div><button class="btn" onclick="changeQty(${p.id},-1)">−</button> ${c.qty} <button class="btn" onclick="changeQty(${p.id},1)">+</button></div><b>${money(v)}</b></div>`}).join(''):'<div class="empty">No items in bill.</div>';document.getElementById('grand').textContent=money(total)}
+function changeQty(id,n){let c=cart.find(x=>x.id===id),p=db.products.find(x=>x.id===id);if(!c)return;c.qty+=n;if(c.qty>p.stock)c.qty=p.stock;if(c.qty<=0)cart=cart.filter(x=>x.id!==id);renderCart()}
+function clearCart(){cart=[];renderCart()}
+function checkout(){if(!cart.length)return toast('Add items first');let total=cart.reduce((a,c)=>a+db.products.find(p=>p.id===c.id).sell*c.qty,0);cart.forEach(c=>db.products.find(p=>p.id===c.id).stock-=c.qty);db.sales.unshift({id:'P'+Date.now().toString().slice(-6),date:new Date().toISOString(),items:cart.reduce((a,c)=>a+c.qty,0),total,payment:document.getElementById('payment').value});save();cart=[];render();toast('Sale completed');}
+function renderSales(){document.getElementById('salesRows').innerHTML=db.sales.length?db.sales.map(x=>`<tr><td><b>${x.id}</b></td><td>${new Date(x.date).toLocaleString('en-IN')}</td><td>${x.items}</td><td><span class="pill">${x.payment}</span></td><td><b>${money(x.total)}</b></td></tr>`).join(''):'<tr><td colspan="5"><div class="empty">No sales yet.</div></td></tr>'}
+function openProduct(id){editId=id||null;let p=id&&db.products.find(x=>x.id===id);document.getElementById('modalTitle').textContent=p?'Edit product':'Add product';['Name','Size','Color','Mrp','Buy','Discount','Sell','Stock','Barcode'].forEach(k=>document.getElementById('f'+k).value=p?.[k.toLowerCase()]??'');if(!p)document.getElementById('fDiscount').value=0;document.getElementById('productModal').classList.add('open')}
+function closeProduct(){document.getElementById('productModal').classList.remove('open')}
+function saveProduct(e){e.preventDefault();let mrp=+fMrp.value||0,disc=+fDiscount.value||0,sell=fSell.value===''?mrp*(1-disc/100):+fSell.value;let p={id:editId||Date.now(),name:fName.value.trim(),size:fSize.value.trim(),color:fColor.value.trim(),mrp,buy:+fBuy.value||0,discount:disc,sell,stock:+fStock.value||0,barcode:fBarcode.value.trim()||('890'+Date.now().toString().slice(-10))};if(editId){let i=db.products.findIndex(x=>x.id===editId);db.products[i]=p}else db.products.push(p);save();closeProduct();render();toast('Product saved')}
+function adjust(id,n){let p=db.products.find(x=>x.id===id),v=prompt('Enter quantity to '+(n>0?'add':'remove'),n>0?'1':'1');if(v===null)return;v=+v||0;p.stock=Math.max(0,p.stock+n*v);save();render()}
+function focusBill(){document.getElementById('billSearch').focus();toast('Enter or scan a barcode')}
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+render();
+</script>
+</body></html>
