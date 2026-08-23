@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>POSHAK — Retail Management</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <style>
 :root{--ink:#17130c;--muted:#766b5a;--line:#e8dfcc;--bg:#f7f3ea;--card:#fffdf8;--accent:#b8862f;--accent2:#d4af37;--dark:#17130d;--danger:#b42318;--ok:#18794e;--shadow:0 8px 30px rgba(75,50,15,.08)}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px Inter,system-ui,-apple-system,Segoe UI,sans-serif}
@@ -38,7 +39,7 @@ button,input,select{font:inherit}button{cursor:pointer}.app{display:flex;min-hei
 
 <section id="products" class="view">
  <div class="top"><div><h1>Products</h1><div class="date">Manage articles and variants</div></div><button class="btn" onclick="openProductModal()">+ Add Product</button></div>
- <div class="panel"><div class="actions" style="margin-bottom:14px"><input id="productSearch" placeholder="Search product, SKU or barcode…" oninput="renderProducts()"></div><div class="table-wrap"><table class="table"><thead><tr><th>Article</th><th>Variant</th><th>SKU</th><th>Barcode</th><th>MRP</th><th>Selling</th><th>Stock</th></tr></thead><tbody id="productRows"></tbody></table></div></div>
+ <div class="panel"><div class="actions" style="margin-bottom:14px"><input id="productSearch" placeholder="Search product, SKU or barcode…" oninput="renderProducts()"></div><div class="table-wrap"><table class="table"><thead><tr><th>Article</th><th>Variant</th><th>SKU</th><th>Barcode</th><th>MRP</th><th>Selling</th><th>Stock</th><th>Barcode</th></tr></thead><tbody id="productRows"></tbody></table></div></div>
 </section>
 
 <section id="inventory" class="view">
@@ -71,7 +72,7 @@ button,input,select{font:inherit}button{cursor:pointer}.app{display:flex;min-hei
 
 <section id="sales" class="view">
  <div class="top"><div><h1>Sales</h1><div class="date">Billing history</div></div></div>
- <div class="panel"><div class="table-wrap"><table class="table"><thead><tr><th>Bill</th><th>Date</th><th>Items</th><th>Payment</th><th>Total</th></tr></thead><tbody id="salesRows"></tbody></table></div></div>
+ <div class="panel"><div class="table-wrap"><table class="table"><thead><tr><th>Bill</th><th>Date</th><th>Items</th><th>Payment</th><th>Total</th><th></th></tr></thead><tbody id="salesRows"></tbody></table></div></div>
 </section>
 </main>
 </div>
@@ -104,13 +105,25 @@ button,input,select{font:inherit}button{cursor:pointer}.app{display:flex;min-hei
  <div class="actions" style="justify-content:flex-end;margin-top:16px"><button class="btn secondary" onclick="closeModal('stockModal')">Cancel</button><button class="btn" onclick="addStock()">Add Stock</button></div>
 </div></div>
 
+<div id="barcodeModal" class="modal"><div class="modalbox" style="width:min(520px,100%);text-align:center">
+ <div class="modalhead"><h2 style="margin:0">Product Barcode</h2><button class="close" onclick="closeModal('barcodeModal')">×</button></div>
+ <div id="barcodeLabelName" style="font-weight:800;font-size:17px;margin-bottom:4px"></div>
+ <div id="barcodeLabelVariant" class="hint" style="margin-bottom:12px"></div>
+ <canvas id="barcodeCanvas" style="max-width:100%;height:auto"></canvas>
+ <div id="barcodeValue" class="hint" style="margin-top:8px"></div>
+ <div class="actions" style="justify-content:center;margin-top:16px">
+   <button class="btn secondary" onclick="closeModal('barcodeModal')">Close</button>
+   <button class="btn" onclick="printBarcode()">Print Label</button>
+ </div>
+</div></div>
+
 <div id="toast" class="toast"></div>
 
 <script>
 const SUPABASE_URL='https://tiqphfzkgtvuwppniajr.supabase.co';
 const SUPABASE_KEY='sb_publishable_Z9-Lco1i2PGkLWwmKnyVRA_8UiUzr0H';
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-let variants=[], products=[], cart=[];
+let variants=[], products=[], cart=[], currentBarcodeVariant=null;
 
 function money(n){return '₹'+Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
@@ -141,7 +154,7 @@ function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 function renderProducts(){
  const q=(document.getElementById('productSearch')?.value||'').toLowerCase();
  const rows=variants.filter(v=>(`${v.products?.name||''} ${v.sku||''} ${v.barcode||''} ${v.size||''} ${v.colour||''}`).toLowerCase().includes(q));
- document.getElementById('productRows').innerHTML=rows.length?rows.map(v=>`<tr><td><b>${esc(v.products?.name||'')}</b><div class="hint">${esc(v.products?.category||'')}</div></td><td>${esc(v.size||'—')} / ${esc(v.colour||'—')}</td><td>${esc(v.sku||'—')}</td><td>${esc(v.barcode||'—')}</td><td>${money(v.mrp)}</td><td>${money(v.selling_price)}</td><td>${Number(v.stock_quantity)}</td></tr>`).join(''):`<tr><td colspan="7" class="empty">No products yet. Click + Add Product.</td></tr>`;
+ document.getElementById('productRows').innerHTML=rows.length?rows.map(v=>`<tr><td><b>${esc(v.products?.name||'')}</b><div class="hint">${esc(v.products?.category||'')}</div></td><td>${esc(v.size||'—')} / ${esc(v.colour||'—')}</td><td>${esc(v.sku||'—')}</td><td>${esc(v.barcode||'—')}</td><td>${money(v.mrp)}</td><td>${money(v.selling_price)}</td><td>${Number(v.stock_quantity)}</td><td><button class="btn secondary" style="padding:6px 9px" onclick="generateBarcode('${v.id}')">${v.barcode?'Print':'Generate'}</button></td></tr>`).join(''):`<tr><td colspan="8" class="empty">No products yet. Click + Add Product.</td></tr>`;
 }
 function renderInventory(){
  document.getElementById('inventoryRows').innerHTML=variants.length?variants.map(v=>`<tr><td><b>${esc(v.products?.name||'')}</b></td><td>${esc(v.size||'—')}</td><td>${esc(v.colour||'—')}</td><td>${esc(v.sku||'—')}</td><td>${esc(v.barcode||'—')}</td><td class="${Number(v.stock_quantity)<=Number(v.reorder_level)?'low':''}">${v.stock_quantity}</td><td>${v.reorder_level}</td></tr>`).join(''):`<tr><td colspan="7" class="empty">No inventory yet.</td></tr>`;
@@ -206,11 +219,55 @@ async function completeSale(){
   toast(`Bill ${billNumber} completed`);cart=[];document.getElementById('customerPhone').value='';await loadData();renderCart();
  }catch(err){console.error(err);toast(err.message||'Could not complete bill')}finally{btn.disabled=false}
 }
-async function renderSales(){
- const {data,error}=await db.from('bills').select('id,bill_number,created_at,payment_method,total,status,bill_items(quantity)').order('created_at',{ascending:false}).limit(100);
- if(error){document.getElementById('salesRows').innerHTML=`<tr><td colspan="5" class="empty">${esc(error.message)}</td></tr>`;return}
- document.getElementById('salesRows').innerHTML=(data||[]).map(b=>`<tr><td><b>${esc(b.bill_number)}</b></td><td>${new Date(b.created_at).toLocaleString('en-IN')}</td><td>${(b.bill_items||[]).reduce((s,i)=>s+i.quantity,0)}</td><td><span class="pill">${esc(b.payment_method)}</span></td><td>${money(b.total)}</td></tr>`).join('')||`<tr><td colspan="5" class="empty">No sales yet.</td></tr>`;
+async function generateBarcode(id){
+ const v=variants.find(x=>x.id===id);if(!v)return;
+ if(!v.barcode){
+   let code='';
+   for(let attempt=0;attempt<10;attempt++){
+     code='890'+String(Math.floor(100000000+Math.random()*900000000));
+     const {data,error}=await db.from('product_variants').select('id').eq('barcode',code).maybeSingle();
+     if(error){toast(error.message);return}
+     if(!data)break;
+   }
+   if(!code){toast('Could not generate barcode');return}
+   const {error}=await db.from('product_variants').update({barcode:code}).eq('id',id);
+   if(error){toast(error.message);return}
+   v.barcode=code;
+   toast('Barcode generated');
+ }
+ currentBarcodeVariant=v;
+ document.getElementById('barcodeLabelName').textContent=v.products?.name||'POSHAK Product';
+ document.getElementById('barcodeLabelVariant').textContent=[v.size,v.colour].filter(Boolean).join(' / ')+' · '+money(v.selling_price);
+ document.getElementById('barcodeValue').textContent=v.barcode;
+ document.getElementById('barcodeModal').classList.add('show');
+ requestAnimationFrame(()=>{JsBarcode('#barcodeCanvas',v.barcode,{format:'CODE128',displayValue:true,lineColor:'#17130d',text:v.barcode,width:2,height:72,margin:12,fontSize:13});});
+ await loadData();
+ currentBarcodeVariant=variants.find(x=>x.id===id)||currentBarcodeVariant;
 }
+function printBarcode(){
+ if(!currentBarcodeVariant?.barcode)return;
+ const v=currentBarcodeVariant;
+ const canvas=document.getElementById('barcodeCanvas');
+ const img=canvas.toDataURL('image/png');
+ const w=window.open('','_blank','width=520,height=420');
+ if(!w){toast('Allow pop-ups to print barcode');return}
+ w.document.write(`<html><head><title>POSHAK Barcode</title><style>body{font-family:Arial,sans-serif;text-align:center;padding:24px}img{max-width:100%}.name{font-weight:700;font-size:18px;margin-bottom:5px}.meta{font-size:13px;color:#555;margin-bottom:14px}@media print{body{padding:8px}}</style></head><body><div class="name">${esc(v.products?.name||'POSHAK Product')}</div><div class="meta">${esc([v.size,v.colour].filter(Boolean).join(' / '))} · ${money(v.selling_price)}</div><img src="${img}"><script>window.onload=()=>{window.print();setTimeout(()=>window.close(),500)}<\/script></body></html>`);
+ w.document.close();
+}
+async function renderSales(){
+ const {data,error}=await db.from('bills').select('id,bill_number,created_at,payment_method,total,status,bill_items(quantity,product_name,size,colour,sku,barcode,selling_price,line_total)').order('created_at',{ascending:false}).limit(100);
+ if(error){document.getElementById('salesRows').innerHTML=`<tr><td colspan="6" class="empty">${esc(error.message)}</td></tr>`;return}
+ document.getElementById('salesRows').innerHTML=(data||[]).map(b=>{
+   const qty=(b.bill_items||[]).reduce((s,i)=>s+Number(i.quantity||0),0);
+   const detail=(b.bill_items||[]).map(i=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--line)"><span><b>${esc(i.product_name)}</b> · ${esc(i.size||'—')} ${esc(i.colour||'—')}<div class="hint">${esc(i.barcode||i.sku||'')} · ${i.quantity} × ${money(i.selling_price)}</div></span><b>${money(i.line_total)}</b></div>`).join('');
+   return `<tr><td><b>${esc(b.bill_number)}</b></td><td>${new Date(b.created_at).toLocaleString('en-IN')}</td><td>${qty}</td><td><span class="pill">${esc(b.payment_method)}</span></td><td>${money(b.total)}</td><td><button class="btn secondary" style="padding:6px 9px" onclick="toggleSaleDetails('${b.id}')">View</button></td></tr><tr id="sale-detail-${b.id}" style="display:none"><td colspan="6" style="background:#fbf6ea"><div style="padding:4px 6px"><b>Articles sold</b>${detail||'<div class="empty">No line items found.</div>'}</div></td></tr>`;
+ }).join('')||`<tr><td colspan="6" class="empty">No sales yet.</td></tr>`;
+}
+function toggleSaleDetails(id){
+ const row=document.getElementById('sale-detail-'+id);
+ if(row)row.style.display=row.style.display==='none'?'table-row':'none';
+}
+
 loadData();
 </script>
 </body>
