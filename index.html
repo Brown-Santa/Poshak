@@ -4,27 +4,61 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>POSHAK — Retail Management</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+let currentUser=null;
+async function initAuth(){
+ const {data:{session}}=await db.auth.getSession();
+ currentUser=session?.user||null; setAuthVisibility();
+ db.auth.onAuthStateChange((_e,s)=>{currentUser=s?.user||null;setAuthVisibility()});
+}
+function setAuthVisibility(){
+ const screen=document.getElementById('authScreen');
+ if(screen)screen.style.display=currentUser?'none':'flex';
+ const app=document.querySelector('.app'); if(app)app.style.display=currentUser?'flex':'none';
+}
+async function login(e){
+ e.preventDefault(); const err=document.getElementById('authError'); err.textContent='';
+ const username=loginUsername.value.trim().toLowerCase();
+ if(username!=='poshakadmin'){err.textContent='Invalid username or password';return;}
+ const {error}=await db.auth.signInWithPassword({email:'poshakadmin@poshak.local',password:loginPassword.value});
+ if(error)err.textContent='Invalid username or password';
+}
+async function logout(){await db.auth.signOut();}
+
+initAuth();
+loadData();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root{--ink:#17130c;--muted:#766b5a;--line:#e8dfcc;--bg:#f7f3ea;--card:#fffdf8;--accent:#b8862f;--accent2:#d4af37;--dark:#17130d;--danger:#b42318;--ok:#18794e;--shadow:0 8px 30px rgba(75,50,15,.08)}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px Inter,system-ui,-apple-system,Segoe UI,sans-serif}
-button,input,select{font:inherit}button{cursor:pointer}.app{display:flex;min-height:100vh}.side{width:235px;background:var(--dark);color:#fff;padding:18px 14px;position:fixed;inset:0 auto 0 0}.brand{text-align:center;padding:4px 8px 22px}.brand img{display:block;width:138px;height:138px;object-fit:contain;margin:0 auto 9px;border-radius:8px}.brand small{display:block;font-size:9px;letter-spacing:.18em;color:#d9c79c}.nav button{display:flex;width:100%;border:0;background:transparent;color:#ddd4c5;padding:12px 13px;border-radius:10px;margin:4px 0;text-align:left;gap:10px;align-items:center}.nav button:hover{background:#2b2418}.nav button.active{background:#3a2d19;color:#f1d78b}.main{margin-left:235px;width:calc(100% - 235px);padding:30px}.view{display:none}.view.active{display:block}.top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px}.top h1{margin:0;font-size:30px}.date{color:var(--muted);margin-top:6px}.btn{border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:9px;padding:10px 15px;font-weight:700}.btn.secondary{background:#fffaf0;color:#7b5a1d;border-color:#d8c28e}.btn.danger{background:#fff1f0;color:var(--danger);border-color:#e6aaa5}.btn:disabled{opacity:.5;cursor:not-allowed}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:18px}.card,.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}.card{padding:18px}.label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}.metric{font-size:29px;font-weight:800;margin-top:10px}.panel{padding:20px;margin-bottom:18px}.panel h2{font-size:18px;margin:0 0 15px}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.grid.three{grid-template-columns:repeat(3,1fr)}label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:5px}input,select{width:100%;border:1px solid #d9cfbd;border-radius:8px;padding:10px;background:#fffdf9;color:var(--ink)}.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.table-wrap{overflow:auto}.table{width:100%;border-collapse:collapse}.table th,.table td{text-align:left;padding:11px 9px;border-bottom:1px solid var(--line);white-space:nowrap}.table th{font-size:12px;color:var(--muted);text-transform:uppercase}.pill{display:inline-block;padding:4px 8px;border-radius:99px;background:#f2e9d5;color:#76571e;font-size:11px;font-weight:700}.low{color:var(--danger);font-weight:800}.empty{padding:35px;text-align:center;color:var(--muted)}.bill-layout{display:grid;grid-template-columns:1.3fr .9fr;gap:18px}.searchrow{display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:14px}.cart-row{display:grid;grid-template-columns:1fr 65px 85px 28px;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}.total{font-size:24px;font-weight:900;text-align:right;margin:16px 0}.toast{position:fixed;right:22px;bottom:22px;background:#17130d;color:#fff;padding:12px 16px;border-radius:9px;display:none;z-index:20}.toast.show{display:block}.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:20px;z-index:10}.modal.show{display:flex}.modalbox{width:min(680px,100%);max-height:90vh;overflow:auto;background:var(--card);border-radius:16px;padding:22px}.modalhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}.close{border:0;background:transparent;font-size:25px}.hint{font-size:12px;color:var(--muted);margin-top:5px}.scanner{display:flex;gap:8px;margin-top:10px}.scanner input{flex:1}
-/* POSHAK dashboard polish */
-.hero{background:linear-gradient(135deg,#171513 0%,#2b241b 55%,#171513 100%);color:#fff;border-radius:20px;padding:24px 26px;display:flex;justify-content:space-between;align-items:center;gap:20px;box-shadow:0 14px 38px rgba(25,18,8,.18);margin-bottom:18px;position:relative;overflow:hidden}
-.hero:after{content:"";position:absolute;width:260px;height:260px;border-radius:50%;right:-100px;top:-150px;background:rgba(212,175,55,.14)}
-.hero h2{margin:0;font-size:25px;letter-spacing:-.02em}.hero p{margin:7px 0 0;color:#d9d1c4}.hero .hero-stat{position:relative;z-index:1;text-align:right}.hero-stat .big{font-size:31px;font-weight:800;color:#e4bd55}.hero-stat .small{font-size:11px;color:#cfc5b5;text-transform:uppercase;letter-spacing:.08em}
-.metric-card{position:relative;overflow:hidden}.metric-card:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:#b8862f}.metric-card .trend{font-size:11px;color:#6d6875;margin-top:7px}
-.dash-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;margin-top:16px}.section-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:13px}.section-head h3{margin:0}.muted{color:#6d6875;font-size:12px}
-.activity-row{display:grid;grid-template-columns:42px 1fr auto;gap:11px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line)}.activity-icon{width:38px;height:38px;border-radius:11px;background:#f7f0df;color:#8a641f;display:grid;place-items:center;font-weight:800}.activity-row:last-child{border-bottom:0}
-.rank-row{display:grid;grid-template-columns:30px 1fr auto;gap:9px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}.rank-row:last-child{border-bottom:0}.rank{font-weight:800;color:#b8862f}.rank-name{font-weight:700}.rank-meta{font-size:11px;color:#6d6875;margin-top:3px}.progress{height:7px;background:#eee9e0;border-radius:99px;overflow:hidden;margin-top:7px}.progress span{display:block;height:100%;background:linear-gradient(90deg,#b8862f,#d4af37);border-radius:99px}
-.quick-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}.quick{padding:14px;border:1px solid var(--line);border-radius:13px;background:#fff;cursor:pointer;transition:.15s}.quick:hover{border-color:#d8c18a;transform:translateY(-1px);box-shadow:0 8px 20px rgba(30,20,10,.06)}.quick b{display:block;margin-bottom:4px}.quick span{font-size:11px;color:#6d6875}
+button,input,select{font:inherit}button{cursor:pointer}.app{display:flex;min-height:100vh}.side{width:235px;background:var(--dark);color:#fff;padding:18px 14px;position:fixed;inset:0 auto 0 0}.brand{text-align:center;padding:4px 8px 22px}.brand img{display:block;width:138px;height:138px;object-fit:contain;margin:0 auto 9px;border-radius:8px}.brand small{display:block;font-size:9px;letter-spacing:.18em;color:#d9c79c}.nav button{display:flex;width:100%;border:0;background:transparent;color:#ddd4c5;padding:12px 13px;border-radius:10px;margin:4px 0;text-align:left;gap:10px;align-items:center}.nav button:hover{background:#2b2418}.nav button.active{background:#3a2d19;color:#f1d78b}.main{margin-left:235px;width:calc(100% - 235px);padding:30px}.view{display:none}.view.active{display:block}.top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px}.top h1{margin:0;font-size:30px}.date{color:var(--muted);margin-top:6px}.btn{border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:9px;padding:10px 15px;font-weight:700}.btn.secondary{background:#fffaf0;color:#7b5a1d;border-color:#d8c28e}.btn.danger{background:#fff1f0;color:var(--danger);border-color:#e6aaa5}.btn:disabled{opacity:.5;cursor:not-allowed}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:18px}.card,.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}.card{padding:18px}.label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}.metric{font-size:29px;font-weight:800;margin-top:10px}.panel{padding:20px;margin-bottom:18px}.panel h2{font-size:18px;margin:0 0 15px}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.grid.three{grid-template-columns:repeat(3,1fr)}label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:5px}input,select{width:100%;border:1px solid #d9cfbd;border-radius:8px;padding:10px;background:#fffdf9;color:var(--ink)}.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.table-wrap{overflow:auto}.table{width:100%;border-collapse:collapse}.table th,.table td{text-align:left;padding:11px 9px;border-bottom:1px solid var(--line);white-space:nowrap}.table th{font-size:12px;color:var(--muted);text-transform:uppercase}.pill{display:inline-block;padding:4px 8px;border-radius:99px;background:#f2e9d5;color:#76571e;font-size:11px;font-weight:700}.low{color:var(--danger);font-weight:800}.empty{padding:35px;text-align:center;color:var(--muted)}.bill-layout{display:grid;grid-template-columns:1.3fr .9fr;gap:18px}.searchrow{display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:14px}.cart-row{display:grid;grid-template-columns:1fr 65px 85px 28px;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}.total{font-size:24px;font-weight:900;text-align:right;margin:16px 0}.toast{position:fixed;right:22px;bottom:22px;background:#17130d;color:#fff;padding:12px 16px;border-radius:9px;display:none;z-index:20}.toast.show{display:block}.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:20px;z-index:10}.modal.show{display:flex}.modalbox{width:min(680px,100%);max-height:90vh;overflow:auto;background:var(--card);border-radius:16px;padding:22px}.modalhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}.close{border:0;background:transparent;font-size:25px}.hint{font-size:12px;color:var(--muted);margin-top:5px}.scanner{display:flex;gap:8px;margin-top:10px}.scanner input{flex:1}@media(max-width:900px){.side{width:76px}.brand img{width:48px;height:48px}.brand small{display:none}.nav span{display:none}.main{margin-left:76px;width:calc(100% - 76px);padding:18px}.cards{grid-template-columns:repeat(2,1fr)}.bill-layout{grid-template-columns:1fr}}@media(max-width:560px){.cards,.grid,.grid.three{grid-template-columns:1fr}.top{gap:12px}.top .btn{display:none}.main{padding:12px}}
 
-@media(max-width:900px){.side{width:76px}.brand img{width:48px;height:48px}.brand small{display:none}.nav span{display:none}.main{margin-left:76px;width:calc(100% - 76px);padding:18px}.cards{grid-template-columns:repeat(2,1fr)}.bill-layout{grid-template-columns:1fr}}@media(max-width:560px){.cards,.grid,.grid.three{grid-template-columns:1fr}.top{gap:12px}.top .btn{display:none}.main{padding:12px}}
+.auth-screen{position:fixed;inset:0;background:#171513;display:flex;align-items:center;justify-content:center;padding:20px;z-index:100}
+.auth-box{width:min(410px,100%);background:#fff;border-radius:22px;padding:30px;box-shadow:0 25px 70px rgba(0,0,0,.35);text-align:center}
+.auth-logo{width:105px;height:105px;object-fit:contain;border-radius:14px}.auth-box h1{margin:8px 0 2px}.auth-box p{color:#6d6875;margin:0 0 22px;font-size:13px}
+.auth-field{text-align:left;margin:12px 0}.auth-field label{display:block;font-size:12px;color:#6d6875;margin-bottom:5px}
+.auth-field input{width:100%;padding:12px;border:1px solid #ddd8e4;border-radius:10px;outline:none}
+.auth-field input:focus{border-color:#b8862f;box-shadow:0 0 0 3px #f7f0df}
+.auth-btn{width:100%;padding:12px;border:0;border-radius:10px;background:#b8862f;color:#fff;font-weight:700;cursor:pointer}
+.auth-error{color:#b91c1c;font-size:12px;min-height:16px;margin-top:10px}
 </style>
 </head>
 <body>
+
+<div id="authScreen" class="auth-screen">
+ <div class="auth-box">
+  <img src="poshak-logo.jpeg" class="auth-logo" alt="POSHAK">
+  <h1>POSHAK</h1><p>Retail Management</p>
+  <form onsubmit="login(event)">
+   <div class="auth-field"><label>Username</label><input id="loginUsername" type="text" autocomplete="username" value="poshakadmin" required></div>
+   <div class="auth-field"><label>Password</label><input id="loginPassword" type="password" autocomplete="current-password" required></div>
+   <button class="auth-btn" type="submit">Sign in</button>
+   <div class="auth-error" id="authError"></div>
+  </form>
+ </div>
+</div>
 <div class="app">
 <aside class="side">
   <div class="brand"><img src="poshak-logo.jpeg" alt="POSHAK logo"><small>RETAIL MANAGEMENT</small></div>
@@ -33,33 +67,20 @@ button,input,select{font:inherit}button{cursor:pointer}.app{display:flex;min-hei
     <button onclick="showView('billing',this)">▤ <span>Billing</span></button>
     <button onclick="showView('products',this)">◇ <span>Products</span></button>
     <button onclick="showView('inventory',this)">▣ <span>Inventory</span></button>
-    <button onclick="showView('sales',this)">◷ <span>Sales</span></button>
+    <button onclick="showView('sales',this)">◷ <span>Sales</span></button><button onclick="logout()">⇥ <span>Logout</span></button>
   </div>
 </aside>
 
 <main class="main">
 <section id="dashboard" class="view active">
- <div class="top"><div><h1>Good to see you.</h1><div class="date" id="today"></div></div><button class="btn" onclick="showView('billing')">+ New Bill</button></div>
- <div class="hero">
-   <div><h2>POSHAK Retail Pulse</h2><p>Sales, stock and what’s moving — all in one glance.</p></div>
-   <div class="hero-stat"><div class="small">Today's revenue</div><div class="big" id="heroSales">₹0</div></div>
- </div>
+ <div class="top"><div><h1>Dashboard</h1><div class="date" id="today"></div></div><button class="btn" onclick="showView('billing')">New Bill</button></div>
  <div class="cards">
-  <div class="card metric-card"><div class="label">Today's Sales</div><div class="metric" id="dSales">₹0</div><div class="trend">Revenue closed today</div></div>
-  <div class="card metric-card"><div class="label">Bills Today</div><div class="metric" id="dBills">0</div><div class="trend">Completed transactions</div></div>
-  <div class="card metric-card"><div class="label">Product Variants</div><div class="metric" id="dVariants">0</div><div class="trend">Live catalogue</div></div>
-  <div class="card metric-card"><div class="label">Low Stock</div><div class="metric" id="dLow">0</div><div class="trend">Needs attention</div></div>
+  <div class="card"><div class="label">Today's Sales</div><div class="metric" id="dSales">₹0</div></div>
+  <div class="card"><div class="label">Bills Today</div><div class="metric" id="dBills">0</div></div>
+  <div class="card"><div class="label">Product Variants</div><div class="metric" id="dVariants">0</div></div>
+  <div class="card"><div class="label">Low Stock</div><div class="metric" id="dLow">0</div></div>
  </div>
- <div class="quick-grid">
-  <div class="quick" onclick="showView('billing')"><b>🧾 Start Billing</b><span>Scan or search an article</span></div>
-  <div class="quick" onclick="showView('products')"><b>＋ Add Product</b><span>Add a new article or variant</span></div>
-  <div class="quick" onclick="showView('inventory')"><b>📦 Check Stock</b><span>See what needs replenishing</span></div>
- </div>
- <div class="dash-grid">
-  <div class="panel"><div class="section-head"><div><h3>Recent sales</h3><div class="muted">Latest completed bills</div></div><button class="btn secondary" onclick="showView('sales')">View all</button></div><div id="dashRecent"></div></div>
-  <div class="panel"><div class="section-head"><div><h3>🏆 What's moving</h3><div class="muted">Top variants by units sold</div></div></div><div id="dashChampions"></div></div>
- </div>
- <div class="panel" style="margin-top:16px"><div class="section-head"><div><h3>Low stock</h3><div class="muted">Variants at or below reorder level</div></div><button class="btn secondary" onclick="showView('inventory')">Manage stock</button></div><div id="lowStock" class="empty">Loading…</div></div>
+ <div class="panel"><h2>Low stock</h2><div id="lowStock" class="empty">Loading…</div></div>
 </section>
 
 <section id="products" class="view">
@@ -178,35 +199,18 @@ async function loadData(){
 async function loadDashboard(){
  document.getElementById('today').textContent=new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
  const start=new Date();start.setHours(0,0,0,0);
- const {data:bills}=await db.from('bills').select('id,bill_number,total,created_at,payment_method,bill_items(quantity,product_name,size,colour,line_total)').gte('created_at',start.toISOString()).eq('status','completed').order('created_at',{ascending:false});
- const rows=bills||[];
- const sales=rows.reduce((s,b)=>s+Number(b.total||0),0);
- document.getElementById('dSales').textContent=money(sales);
- document.getElementById('heroSales').textContent=money(sales);
- document.getElementById('dBills').textContent=rows.length;
- document.getElementById('dVariants').textContent=variants.length;
-
+ const {data:bills}=await db.from('bills').select('total,created_at').gte('created_at',start.toISOString()).eq('status','completed');
+ const sales=(bills||[]).reduce((s,b)=>s+Number(b.total||0),0);
+ document.getElementById('dSales').textContent=money(sales);document.getElementById('dBills').textContent=(bills||[]).length;document.getElementById('dVariants').textContent=variants.length;
  const low=variants.filter(v=>Number(v.stock_quantity)<=Number(v.reorder_level));
  document.getElementById('dLow').textContent=low.length;
- document.getElementById('lowStock').innerHTML=low.length?low.map(v=>`<div style="display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid var(--line)"><span><b>${esc(v.products?.name||'')}</b> ${esc(v.size||'')} ${esc(v.colour||'')}</span><span class="low">${v.stock_quantity} left</span></div>`).join(''):'<div class="empty">Stock is looking healthy. No urgent replenishment.</div>';
-
- document.getElementById('dashRecent').innerHTML=rows.slice(0,5).map(b=>`<div class="activity-row"><div class="activity-icon">₹</div><div><b>${esc(b.bill_number)}</b><div class="muted">${new Date(b.created_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})} · ${(b.bill_items||[]).reduce((n,i)=>n+Number(i.quantity||0),0)} item(s) · ${esc((b.payment_method||'').toUpperCase())}</div></div><strong>${money(b.total)}</strong></div>`).join('')||'<div class="empty">No sales yet today.</div>';
-
- const map={};
- rows.forEach(b=>(b.bill_items||[]).forEach(i=>{
-   const key=[i.product_name||'',i.size||'',i.colour||''].join('|');
-   if(!map[key])map[key]={name:i.product_name||'',size:i.size||'',colour:i.colour||'',units:0};
-   map[key].units+=Number(i.quantity||0);
- }));
- const champions=Object.values(map).sort((a,b)=>b.units-a.units).slice(0,5);
- const max=champions[0]?.units||1;
- document.getElementById('dashChampions').innerHTML=champions.length?champions.map((x,i)=>`<div class="rank-row"><div class="rank">#${i+1}</div><div><div class="rank-name">${esc(x.name)}</div><div class="rank-meta">${esc(x.size||'—')} · ${esc(x.colour||'—')} · ${x.units} sold<div class="progress"><span style="width:${Math.max(8,Math.round(x.units/max*100))}%"></span></div></div></div>`).join(''):'<div class="empty">Sell a few articles and your champions will appear here.</div>';
+ document.getElementById('lowStock').innerHTML=low.length?low.map(v=>`<div style="display:flex;justify-content:space-between;padding:10px;border-bottom:1px solid var(--line)"><span><b>${esc(v.products?.name||'')}</b> ${esc(v.size||'')} ${esc(v.colour||'')}</span><span class="low">${v.stock_quantity} left</span></div>`).join(''):'No low-stock variants.';
 }
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
 function renderProducts(){
  const q=(document.getElementById('productSearch')?.value||'').toLowerCase();
  const rows=variants.filter(v=>(`${v.products?.name||''} ${v.sku||''} ${v.barcode||''} ${v.size||''} ${v.colour||''}`).toLowerCase().includes(q));
- document.getElementById('productRows').innerHTML=rows.length?rows.map(v=>`<tr><td><b>${esc(v.products?.name||'')}</b><div class="hint">${esc(v.products?.category||'')}</div></td><td>${esc(v.size||'—')} / ${esc(v.colour||'—')}</td><td>${esc(v.sku||'—')}</td><td>${esc(v.barcode||'—')}</td><td>${money(v.mrp)}</td><td>${money(v.selling_price)}</td><td>${Number(v.stock_quantity)}</td><td><button class="btn secondary" style="padding:6px 9px" onclick="generateBarcode('${v.id}')">${v.barcode?'Print':'Generate'}</button></td></tr>`).join(''):`<tr><td colspan="8" class="empty">No products yet. Click + Add Product.</td></tr>`;
+ document.getElementById('productRows').innerHTML=rows.length?rows.map(v=>`<tr><td><b>${esc(v.products?.name||'')}</b><div class="hint">${esc(v.products?.category||'')}</div></td><td>${esc(v.size||'—')} / ${esc(v.colour||'—')}</td><td>${esc(v.sku||'—')}</td><td>${esc(v.barcode||'—')}</td><td>${money(v.mrp)}</td><td>MRP ₹${money(v.mrp)}</td><td>${Number(v.stock_quantity)}</td><td><button class="btn secondary" style="padding:6px 9px" onclick="generateBarcode('${v.id}')">${v.barcode?'Print':'Generate'}</button></td></tr>`).join(''):`<tr><td colspan="8" class="empty">No products yet. Click + Add Product.</td></tr>`;
 }
 function renderInventory(){
  document.getElementById('inventoryRows').innerHTML=variants.length?variants.map(v=>`<tr><td><b>${esc(v.products?.name||'')}</b></td><td>${esc(v.size||'—')}</td><td>${esc(v.colour||'—')}</td><td>${esc(v.sku||'—')}</td><td>${esc(v.barcode||'—')}</td><td class="${Number(v.stock_quantity)<=Number(v.reorder_level)?'low':''}">${v.stock_quantity}</td><td>${v.reorder_level}</td></tr>`).join(''):`<tr><td colspan="7" class="empty">No inventory yet.</td></tr>`;
@@ -249,7 +253,7 @@ async function addStock(){
 function renderBillMatches(){
  const q=(document.getElementById('billSearch')?.value||'').trim().toLowerCase();
  const list=q?variants.filter(v=>(`${v.products?.name||''} ${v.sku||''} ${v.barcode||''} ${v.size||''} ${v.colour||''}`).toLowerCase().includes(q)).slice(0,8):[];
- document.getElementById('billMatches').innerHTML=list.map(v=>`<div class="panel" style="padding:11px;margin:6px 0;display:flex;justify-content:space-between;align-items:center"><div><b>${esc(v.products?.name||'')}</b> — ${esc(v.size||'')} ${esc(v.colour||'')}<div class="hint">${esc(v.barcode||v.sku||'')} · ${money(v.selling_price)} · stock ${v.stock_quantity}</div></div><button class="btn secondary" ${v.stock_quantity<1?'disabled':''} onclick="addToCart('${v.id}')">Add</button></div>`).join('');
+ document.getElementById('billMatches').innerHTML=list.map(v=>`<div class="panel" style="padding:11px;margin:6px 0;display:flex;justify-content:space-between;align-items:center"><div><b>${esc(v.products?.name||'')}</b> — ${esc(v.size||'')} ${esc(v.colour||'')}<div class="hint">${esc(v.barcode||v.sku||'')} · MRP ₹${money(v.mrp)} · stock ${v.stock_quantity}</div></div><button class="btn secondary" ${v.stock_quantity<1?'disabled':''} onclick="addToCart('${v.id}')">Add</button></div>`).join('');
  renderCart();
 }
 function addByBarcode(){const code=document.getElementById('scanInput').value.trim();if(!code)return;const v=variants.find(x=>x.barcode===code||x.sku===code);if(!v){toast('Barcode/SKU not found');return}addToCart(v.id);document.getElementById('scanInput').value=''}
@@ -335,7 +339,7 @@ function printBarcode(){
  const img=canvas.toDataURL('image/png');
  const w=window.open('','_blank','width=520,height=420');
  if(!w){toast('Allow pop-ups to print barcode');return}
- w.document.write(`<html><head><title>POSHAK Barcode</title><style>body{font-family:Arial,sans-serif;text-align:center;padding:24px}img{max-width:100%}.name{font-weight:700;font-size:18px;margin-bottom:5px}.meta{font-size:13px;color:#555;margin-bottom:14px}@media print{body{padding:8px}}</style></head><body><div class="name">${esc(v.products?.name||'POSHAK Product')}</div><div class="meta">${esc([v.size,v.colour].filter(Boolean).join(' / '))} · ${money(v.selling_price)}</div><img src="${img}"><script>window.onload=()=>{window.print();setTimeout(()=>window.close(),500)}<\/script></body></html>`);
+ w.document.write(`<html><head><title>POSHAK Barcode</title><style>body{font-family:Arial,sans-serif;text-align:center;padding:24px}img{max-width:100%}.name{font-weight:700;font-size:18px;margin-bottom:5px}.meta{font-size:13px;color:#555;margin-bottom:14px}@media print{body{padding:8px}}</style></head><body><div class="name">${esc(v.products?.name||'POSHAK Product')}</div><div class="meta">${esc([v.size,v.colour].filter(Boolean).join(' / '))} · MRP ₹${money(v.mrp)}</div><img src="${img}"><script>window.onload=()=>{window.print();setTimeout(()=>window.close(),500)}<\/script></body></html>`);
  w.document.close();
 }
 let salesCache=[];
@@ -440,7 +444,7 @@ function exportSalesExcel(){
  if(!rows.length){toast('No sales to export');return}
  if(typeof XLSX==='undefined'){toast('Excel library not loaded');return}
  const sales=[];
- rows.forEach(b=>(b.bill_items||[]).forEach(i=>sales.push({Bill:b.bill_number,Date:new Date(b.created_at).toLocaleString('en-IN'),Payment:b.payment_method,Article:i.product_name,Size:i.size||'',Colour:i.colour||'',SKU:i.sku||'',Barcode:i.barcode||'',Quantity:Number(i.quantity||0),'Selling Price':Number(i.selling_price||0),'Line Total':Number(i.line_total||0)})));
+ rows.forEach(b=>(b.bill_items||[]).forEach(i=>sales.push({Bill:b.bill_number,Date:new Date(b.created_at).toLocaleString('en-IN'),Payment:b.payment_method,Article:i.product_name,Size:i.size||'',Colour:i.colour||'',SKU:i.sku||'',Barcode:i.barcode||'',Quantity:Number(i.quantity||0),'MRP':Number(i.selling_price||0),'Line Total':Number(i.line_total||0)})));
  const champs=championData(rows).map((x,i)=>({Rank:i+1,Article:x.name,Size:x.size,Colour:x.colour,SKU:x.sku,Barcode:x.barcode,'Units Sold':x.units,Revenue:x.revenue}));
  const duffers=dufferData(rows).map((x,i)=>({Rank:i+1,Article:x.name,Size:x.size,Colour:x.colour,SKU:x.sku,Barcode:x.barcode,'Stock Left':x.stock,'Units Sold':x.units,Revenue:x.revenue}));
  const summary=[{Metric:'Total Sales',Value:rows.reduce((s,b)=>s+Number(b.total||0),0)},{Metric:'Bills',Value:rows.length},{Metric:'Units Sold',Value:sales.reduce((s,x)=>s+x.Quantity,0)},{Metric:'Average Bill',Value:rows.length?rows.reduce((s,b)=>s+Number(b.total||0),0)/rows.length:0},{Metric:'Champion Product',Value:champs[0]?.Article||'—'},{Metric:'Champion Size',Value:champs[0]?.Size||'—'},{Metric:'Champion Colour',Value:champs[0]?.Colour||'—'},{Metric:'Duffer Product',Value:duffers[0]?.Article||'—'},{Metric:'Duffer Size',Value:duffers[0]?.Size||'—'},{Metric:'Duffer Stock Left',Value:duffers[0]?.['Stock Left']||0}];
