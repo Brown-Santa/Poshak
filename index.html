@@ -53,7 +53,7 @@ button,input,select{font:inherit}button{cursor:pointer}.app{display:flex;min-hei
 </section>
 
 <section id="products" class="view">
- <div class="top"><div><h1>Products</h1><div class="date">Manage articles and variants</div></div><button class="btn" onclick="openProductModal()">+ Add Product</button></div>
+ <div class="top"><div><h1>Products</h1><div class="date">Manage articles and variants</div></div><div style="display:flex;gap:10px"><button class="btn secondary" onclick="downloadImportTemplate()">⭳ Template</button><button class="btn secondary" onclick="openModal('importModal')">⭱ Import Excel</button><button class="btn" onclick="openProductModal()">+ Add Product</button></div></div>
  <div class="panel"><div class="actions" style="margin-bottom:14px"><input id="productSearch" placeholder="Search product, SKU or barcode…" oninput="renderProducts()"></div><div class="table-wrap"><table class="table"><thead><tr><th>Article</th><th>Variant</th><th>SKU</th><th>Barcode</th><th>MRP</th><th>Selling</th><th>Stock</th><th>Barcode</th></tr></thead><tbody id="productRows"></tbody></table></div></div>
 </section>
 
@@ -101,6 +101,15 @@ button,input,select{font:inherit}button{cursor:pointer}.app{display:flex;min-hei
 </section>
 </main>
 </div>
+
+<div id="importModal" class="modal"><div class="modalbox">
+ <div class="modalhead"><h2 style="margin:0">Import Products from Excel</h2><button class="close" onclick="closeImportModal()">×</button></div>
+ <div class="hint" style="margin-bottom:12px">Columns needed: <b>Name, Category, Brand, Size, Colour, SKU, Barcode, MRP, Selling Price, Stock, Reorder Level</b>. SKU/Barcode can be left blank — POSHAK will auto-generate a barcode. Don't have the file ready? <a href="#" onclick="downloadImportTemplate();return false">download the template</a> first.</div>
+ <input type="file" id="importFile" accept=".xlsx,.xls,.csv" onchange="handleImportFile(event)">
+ <div id="importStatus" style="margin-top:14px"></div>
+ <div id="importSummary" class="hint" style="margin-top:10px;white-space:pre-line"></div>
+ <div class="actions" style="justify-content:flex-end;margin-top:16px"><button type="button" class="btn secondary" onclick="closeImportModal()">Close</button></div>
+</div></div>
 
 <div id="productModal" class="modal"><div class="modalbox">
  <div class="modalhead"><h2 style="margin:0">Add Product</h2><button class="close" onclick="closeModal('productModal')">×</button></div>
@@ -156,6 +165,85 @@ function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t
 function showView(id,btn){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active'); if(id==='dashboard')loadDashboard();if(id==='products')renderProducts();if(id==='inventory')renderInventory();if(id==='sales')renderSales();if(id==='billing')renderBillMatches()}
 function openProductModal(){document.getElementById('productModal').classList.add('show')}
 function openStockModal(){fillStockVariants();document.getElementById('stockModal').classList.add('show')}
+function openModal(id){document.getElementById(id).classList.add('show')}
+
+function closeImportModal(){closeModal('importModal');document.getElementById('importFile').value='';document.getElementById('importStatus').innerHTML='';document.getElementById('importSummary').textContent=''}
+
+function downloadImportTemplate(){
+ const sample=[{Name:'Slim Fit Jeans',Category:'Jeans',Brand:'POSHAK',Size:'32',Colour:'Blue',SKU:'',Barcode:'',MRP:1499,'Selling Price':1299,Stock:10,'Reorder Level':5}];
+ const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(sample),'Products');
+ XLSX.writeFile(wb,'POSHAK-Import-Template.xlsx');
+}
+
+async function generateUniqueBarcodeForImport(){
+ for(let i=0;i<20;i++){
+  const code='200'+String(Math.floor(Math.random()*1000000000)).padStart(9,'0');
+  const {data,error}=await db.from('product_variants').select('id').eq('barcode',code).maybeSingle();
+  if(!error && !data)return code;
+ }
+ return null;
+}
+
+async function handleImportFile(e){
+ const file=e.target.files[0];if(!file)return;
+ const statusEl=document.getElementById('importStatus'),summaryEl=document.getElementById('importSummary');
+ summaryEl.textContent='';statusEl.innerHTML='Reading file…';
+ let rows;
+ try{
+  const buf=await file.arrayBuffer();
+  const wb=XLSX.read(buf,{type:'array'});
+  const sheet=wb.Sheets[wb.SheetNames[0]];
+  rows=XLSX.utils.sheet_to_json(sheet,{defval:''});
+ }catch(err){statusEl.innerHTML='';toast('Could not read the file. Please use the template format.');return}
+ if(!rows.length){statusEl.innerHTML='';toast('No rows found in the file.');return}
+
+ let added=0,failed=0;const errors=[];
+ // cache of existing products by "name|brand" (lowercased) to product_id, to avoid creating duplicate products
+ const productCache={};
+ for(const p of products)productCache[(p.name||'').trim().toLowerCase()+'|'+(p.brand||'').trim().toLowerCase()]=p.id;
+
+ for(let i=0;i<rows.length;i++){
+  const r=rows[i];
+  statusEl.innerHTML=`Importing row ${i+1} of ${rows.length}…`;
+  const name=String(r.Name||r.name||'').trim();
+  if(!name){failed++;errors.push(`Row ${i+2}: missing Name, skipped`);continue}
+  const category=String(r.Category||r.category||'Others').trim();
+  const brand=String(r.Brand||r.brand||'').trim();
+  const size=String(r.Size||r.size||'').trim();
+  const colour=String(r.Colour||r.Color||r.colour||r.color||'').trim();
+  let sku=String(r.SKU||r.Sku||r.sku||'').trim()||null;
+  let barcode=String(r.Barcode||r.barcode||'').trim()||null;
+  const mrp=Number(r.MRP||r.Mrp||r.mrp||0);
+  const sell=Number(r['Selling Price']||r.SellingPrice||r.selling_price||r['Selling price']||0);
+  const stock=Number(r.Stock||r.stock||r['Stock Quantity']||0);
+  const reorder=Number(r['Reorder Level']||r.reorder_level||r['Reorder level']||5);
+
+  if(!mrp||!sell){failed++;errors.push(`Row ${i+2} (${name}): missing MRP or Selling Price, skipped`);continue}
+
+  const key=name.toLowerCase()+'|'+brand.toLowerCase();
+  let productId=productCache[key];
+  if(!productId){
+   const {data:p,error:pe}=await db.from('products').insert({name,category,brand}).select().single();
+   if(pe){failed++;errors.push(`Row ${i+2} (${name}): ${pe.message}`);continue}
+   productId=p.id;productCache[key]=productId;products.push(p);
+  }
+
+  if(!barcode){
+   barcode=await generateUniqueBarcodeForImport();
+   if(!barcode){failed++;errors.push(`Row ${i+2} (${name}): could not generate a unique barcode`);continue}
+  }
+
+  const {data:v,error:ve}=await db.from('product_variants').insert({product_id:productId,sku,barcode,size,colour,mrp,selling_price:sell,stock_quantity:stock,reorder_level:reorder}).select().single();
+  if(ve){failed++;errors.push(`Row ${i+2} (${name}): ${ve.message}`);continue}
+  if(stock)await db.from('inventory_movements').insert({variant_id:v.id,movement_type:'opening_stock',quantity:stock,notes:'Bulk import'});
+  added++;
+ }
+
+ statusEl.innerHTML=`<b>Done.</b> ${added} row(s) imported${failed?`, ${failed} skipped`:''}.`;
+ summaryEl.textContent=errors.length?('Issues:\n'+errors.slice(0,20).join('\n')+(errors.length>20?`\n…and ${errors.length-20} more`:'')):'';
+ document.getElementById('importFile').value='';
+ if(added)await loadData();
+}
 function closeModal(id){document.getElementById(id).classList.remove('show')}
 async function loadData(){
  const [pr,vr]=await Promise.all([
