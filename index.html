@@ -260,70 +260,68 @@ async function completeSale(){
    autoPrintWindow.document.write('<!doctype html><html><head><title>POSHAK</title></head><body style="font-family:Arial,sans-serif;text-align:center;padding:30px"><h2>POSHAK</h2><p>Preparing bill...</p>
 <script>
 (function(){
-  const POSHAK_LOGIN_EMAIL = 'poshakadmin@poshak.local';
+  const LOGIN_EMAIL='poshakadmin@poshak.local';
 
-  function setLoginState(user){
-    const screen = document.getElementById('authScreen');
-    const app = document.querySelector('.app');
-    const loggedIn = !!user;
-    if(screen) screen.style.display = loggedIn ? 'none' : 'flex';
-    if(app) app.style.display = loggedIn ? 'flex' : 'none';
+  function ui(user){
+    const screen=document.getElementById('authScreen');
+    const app=document.querySelector('.app');
+    if(user){
+      screen.style.display='none';
+      app.style.display='flex';
+      if(typeof loadData==='function') loadData();
+    }else{
+      screen.style.display='flex';
+      app.style.display='none';
+    }
   }
 
-  window.poshakLogout = async function(){
-    const result = await db.auth.signOut();
-    if(result.error) console.error(result.error);
+  window.poshakLogout=async function(){
+    await db.auth.signOut();
   };
 
-  window.poshakInitAuth = async function(){
-    const sessionResult = await db.auth.getSession();
-    if(sessionResult.error){
-      console.error(sessionResult.error);
-      setLoginState(null);
-      return;
-    }
+  async function boot(){
+    const {data,error}=await db.auth.getSession();
+    if(error){console.error(error);ui(null);return;}
+    ui(data.session?.user||null);
 
-    setLoginState(sessionResult.data.session?.user || null);
-
-    db.auth.onAuthStateChange(function(_event, session){
-      setLoginState(session?.user || null);
-      if(session?.user && typeof loadData === 'function') loadData();
+    db.auth.onAuthStateChange((_event,session)=>{
+      ui(session?.user||null);
     });
-  };
 
-  document.addEventListener('DOMContentLoaded', function(){
-    const form = document.getElementById('poshakLoginForm');
-
-    form.addEventListener('submit', async function(e){
+    const form=document.getElementById('poshakLoginForm');
+    form.onsubmit=async function(e){
       e.preventDefault();
+      const username=document.getElementById('poshakUsername').value.trim().toLowerCase();
+      const password=document.getElementById('poshakPassword').value;
+      const err=document.getElementById('poshakAuthError');
+      err.textContent='';
 
-      const username = document.getElementById('poshakUsername').value.trim().toLowerCase();
-      const password = document.getElementById('poshakPassword').value;
-      const errorBox = document.getElementById('poshakAuthError');
-
-      errorBox.textContent = '';
-
-      if(username !== 'poshakadmin'){
-        errorBox.textContent = 'Invalid username or password';
+      if(username!=='poshakadmin'){
+        err.textContent='Invalid username or password';
         return;
       }
 
-      const result = await db.auth.signInWithPassword({
-        email: POSHAK_LOGIN_EMAIL,
-        password: password
+      const result=await db.auth.signInWithPassword({
+        email:LOGIN_EMAIL,
+        password:password
       });
 
       if(result.error){
-        console.error(result.error);
-        errorBox.textContent = 'Invalid username or password';
+        console.error('POSHAK login error:',result.error);
+        err.textContent=result.error.message;
         return;
       }
 
-      document.getElementById('poshakPassword').value = '';
-    });
+      document.getElementById('poshakPassword').value='';
+      ui(result.data.user);
+    };
+  }
 
-    window.poshakInitAuth();
-  });
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',boot);
+  }else{
+    boot();
+  }
 })();
 </script>
 
