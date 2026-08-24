@@ -54,7 +54,7 @@ button,input,select{font:inherit}button{cursor:pointer}.app{display:flex;min-hei
 
 <section id="products" class="view">
  <div class="top"><div><h1>Products</h1><div class="date">Manage articles and variants</div></div><div style="display:flex;gap:10px"><button class="btn secondary" onclick="downloadImportTemplate()">⭳ Template</button><button class="btn secondary" onclick="openModal('importModal')">⭱ Import Excel</button><button class="btn" onclick="openProductModal()">+ Add Product</button></div></div>
- <div class="panel"><div class="actions" style="margin-bottom:14px"><input id="productSearch" placeholder="Search product, SKU or barcode…" oninput="renderProducts()"></div><div class="table-wrap"><table class="table"><thead><tr><th>Article</th><th>Variant</th><th>SKU</th><th>Barcode</th><th>MRP</th><th>Selling</th><th>Stock</th><th>Barcode</th></tr></thead><tbody id="productRows"></tbody></table></div></div>
+ <div class="panel"><div class="actions" style="margin-bottom:14px"><input id="productSearch" placeholder="Search product, SKU or barcode…" oninput="renderProducts()"></div><div class="table-wrap"><table class="table"><thead><tr><th>Article</th><th>Variant</th><th>SKU</th><th>Barcode</th><th>MRP</th><th>Selling</th><th>Stock</th><th>Barcode</th><th>Action</th></tr></thead><tbody id="productRows"></tbody></table></div></div>
 </section>
 
 <section id="inventory" class="view">
@@ -178,6 +178,39 @@ function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t
 function showView(id,btn){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active'); if(id==='dashboard')loadDashboard();if(id==='products')renderProducts();if(id==='inventory')renderInventory();if(id==='sales')renderSales();if(id==='billing')renderBillMatches()}
 function openProductModal(){document.getElementById('productModal').classList.add('show')}
 function openStockModal(){fillStockVariants();document.getElementById('stockModal').classList.add('show')}
+async function deleteVariant(id){
+ const v=variants.find(x=>x.id===id);
+ if(!confirm(`Delete "${v?.products?.name||'this item'}" (${v?.size||''} ${v?.colour||''})? This cannot be undone.`))return;
+ let {error}=await db.from('product_variants').delete().eq('id',id);
+ if(error){
+  if(!confirm('This item has sales history linked to it, so it can\'t be deleted directly. Deleting it will also permanently remove those past bill line items. Continue?'))return;
+  let r=await db.from('bill_items').delete().eq('variant_id',id);if(r.error){toast(r.error.message);return}
+  r=await db.from('inventory_movements').delete().eq('variant_id',id);if(r.error){toast(r.error.message);return}
+  ({error}=await db.from('product_variants').delete().eq('id',id));
+  if(error){toast(error.message);return}
+ }
+ // if this was the product's last variant, remove the empty product row too
+ if(v?.product_id){
+  const {data:remaining}=await db.from('product_variants').select('id').eq('product_id',v.product_id).limit(1);
+  if(!remaining||!remaining.length)await db.from('products').delete().eq('id',v.product_id);
+ }
+ toast('Item deleted');await loadData();
+}
+async function deleteBill(id){
+ if(!confirm('Delete this bill? Stock will be restored for items still in your catalog. This cannot be undone.'))return;
+ const {data:items,error:ie}=await db.from('bill_items').select('id,variant_id,quantity').eq('bill_id',id);
+ if(ie){toast(ie.message);return}
+ for(const it of items||[]){
+  if(!it.variant_id)continue;
+  const cur=variants.find(x=>x.id===it.variant_id);
+  if(cur)await db.from('product_variants').update({stock_quantity:Number(cur.stock_quantity)+Number(it.quantity)}).eq('id',it.variant_id);
+ }
+ await db.from('inventory_movements').delete().eq('reference_id',id);
+ await db.from('bill_items').delete().eq('bill_id',id);
+ const {error}=await db.from('bills').delete().eq('id',id);
+ if(error){toast(error.message);return}
+ toast('Bill deleted');await loadData();
+}
 function openModal(id){document.getElementById(id).classList.add('show')}
 
 function closeImportModal(){closeModal('importModal');document.getElementById('importFile').value='';document.getElementById('importStatus').innerHTML='';document.getElementById('importSummary').textContent=''}
@@ -281,7 +314,7 @@ function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 function renderProducts(){
  const q=(document.getElementById('productSearch')?.value||'').toLowerCase();
  const rows=variants.filter(v=>(`${v.products?.name||''} ${v.sku||''} ${v.barcode||''} ${v.size||''} ${v.colour||''}`).toLowerCase().includes(q));
- document.getElementById('productRows').innerHTML=rows.length?rows.map(v=>`<tr><td><b>${esc(v.products?.name||'')}</b><div class="hint">${esc(v.products?.category||'')}</div></td><td>${esc(v.size||'—')} / ${esc(v.colour||'—')}</td><td>${esc(v.sku||'—')}</td><td>${esc(v.barcode||'—')}</td><td>${money(v.mrp)}</td><td>${money(v.selling_price)}</td><td>${Number(v.stock_quantity)}</td><td><button class="btn secondary" style="padding:6px 9px" onclick="generateBarcode('${v.id}')">${v.barcode?'Print':'Generate'}</button></td></tr>`).join(''):`<tr><td colspan="8" class="empty">No products yet. Click + Add Product.</td></tr>`;
+ document.getElementById('productRows').innerHTML=rows.length?rows.map(v=>`<tr><td><b>${esc(v.products?.name||'')}</b><div class="hint">${esc(v.products?.category||'')}</div></td><td>${esc(v.size||'—')} / ${esc(v.colour||'—')}</td><td>${esc(v.sku||'—')}</td><td>${esc(v.barcode||'—')}</td><td>${money(v.mrp)}</td><td>${money(v.selling_price)}</td><td>${Number(v.stock_quantity)}</td><td><button class="btn secondary" style="padding:6px 9px" onclick="generateBarcode('${v.id}')">${v.barcode?'Print':'Generate'}</button></td><td><button class="btn danger" style="padding:6px 9px" onclick="deleteVariant('${v.id}')">Delete</button></td></tr>`).join(''):`<tr><td colspan="9" class="empty">No products yet. Click + Add Product.</td></tr>`;
 }
 function renderInventory(){
  document.getElementById('inventoryRows').innerHTML=variants.length?variants.map(v=>`<tr><td><b>${esc(v.products?.name||'')}</b></td><td>${esc(v.size||'—')}</td><td>${esc(v.colour||'—')}</td><td>${esc(v.sku||'—')}</td><td>${esc(v.barcode||'—')}</td><td class="${Number(v.stock_quantity)<=Number(v.reorder_level)?'low':''}">${v.stock_quantity}</td><td>${v.reorder_level}</td></tr>`).join(''):`<tr><td colspan="7" class="empty">No inventory yet.</td></tr>`;
@@ -475,7 +508,7 @@ async function renderSales(){
  renderSalesInsights(rows);renderChampions(rows);renderDuffers(rows);
  document.getElementById('salesRows').innerHTML=rows.map(b=>{
    const qty=(b.bill_items||[]).reduce((s,i)=>s+Number(i.quantity||0),0);
-   return `<tr><td><b>${esc(b.bill_number)}</b></td><td>${new Date(b.created_at).toLocaleString('en-IN')}</td><td>${qty}</td><td><span class="pill">${esc(b.payment_method)}</span></td><td>${money(b.total)}</td><td><div class="actions"><button class="btn secondary" style="padding:6px 9px" onclick="toggleSaleDetails('${b.id}')">View</button><button class="btn secondary" style="padding:6px 9px" onclick="printBill('${b.id}')">Print</button></div></td></tr><tr id="sale-detail-${b.id}" style="display:none"><td colspan="6" style="background:#fbf6ea"><div style="padding:4px 6px"><b>Articles sold</b>${renderBillItemsDetail(b)}</div></td></tr>`;
+   return `<tr><td><b>${esc(b.bill_number)}</b></td><td>${new Date(b.created_at).toLocaleString('en-IN')}</td><td>${qty}</td><td><span class="pill">${esc(b.payment_method)}</span></td><td>${money(b.total)}</td><td><div class="actions"><button class="btn secondary" style="padding:6px 9px" onclick="toggleSaleDetails('${b.id}')">View</button><button class="btn secondary" style="padding:6px 9px" onclick="printBill('${b.id}')">Print</button><button class="btn danger" style="padding:6px 9px" onclick="deleteBill('${b.id}')">Delete</button></div></td></tr><tr id="sale-detail-${b.id}" style="display:none"><td colspan="6" style="background:#fbf6ea"><div style="padding:4px 6px"><b>Articles sold</b>${renderBillItemsDetail(b)}</div></td></tr>`;
  }).join('')||`<tr><td colspan="6" class="empty">No sales found for the selected period.</td></tr>`;
 }
 
