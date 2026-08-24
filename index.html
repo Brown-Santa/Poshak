@@ -11,32 +11,10 @@
 :root{--ink:#17130c;--muted:#766b5a;--line:#e8dfcc;--bg:#f7f3ea;--card:#fffdf8;--accent:#b8862f;--accent2:#d4af37;--dark:#17130d;--danger:#b42318;--ok:#18794e;--shadow:0 8px 30px rgba(75,50,15,.08)}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px Inter,system-ui,-apple-system,Segoe UI,sans-serif}
 button,input,select{font:inherit}button{cursor:pointer}.app{display:flex;min-height:100vh}.side{width:235px;background:var(--dark);color:#fff;padding:18px 14px;position:fixed;inset:0 auto 0 0}.brand{text-align:center;padding:4px 8px 22px}.brand img{display:block;width:138px;height:138px;object-fit:contain;margin:0 auto 9px;border-radius:8px}.brand small{display:block;font-size:9px;letter-spacing:.18em;color:#d9c79c}.nav button{display:flex;width:100%;border:0;background:transparent;color:#ddd4c5;padding:12px 13px;border-radius:10px;margin:4px 0;text-align:left;gap:10px;align-items:center}.nav button:hover{background:#2b2418}.nav button.active{background:#3a2d19;color:#f1d78b}.main{margin-left:235px;width:calc(100% - 235px);padding:30px}.view{display:none}.view.active{display:block}.top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px}.top h1{margin:0;font-size:30px}.date{color:var(--muted);margin-top:6px}.btn{border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:9px;padding:10px 15px;font-weight:700}.btn.secondary{background:#fffaf0;color:#7b5a1d;border-color:#d8c28e}.btn.danger{background:#fff1f0;color:var(--danger);border-color:#e6aaa5}.btn:disabled{opacity:.5;cursor:not-allowed}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:18px}.card,.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}.card{padding:18px}.label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}.metric{font-size:29px;font-weight:800;margin-top:10px}.panel{padding:20px;margin-bottom:18px}.panel h2{font-size:18px;margin:0 0 15px}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.grid.three{grid-template-columns:repeat(3,1fr)}label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:5px}input,select{width:100%;border:1px solid #d9cfbd;border-radius:8px;padding:10px;background:#fffdf9;color:var(--ink)}.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.table-wrap{overflow:auto}.table{width:100%;border-collapse:collapse}.table th,.table td{text-align:left;padding:11px 9px;border-bottom:1px solid var(--line);white-space:nowrap}.table th{font-size:12px;color:var(--muted);text-transform:uppercase}.pill{display:inline-block;padding:4px 8px;border-radius:99px;background:#f2e9d5;color:#76571e;font-size:11px;font-weight:700}.low{color:var(--danger);font-weight:800}.empty{padding:35px;text-align:center;color:var(--muted)}.bill-layout{display:grid;grid-template-columns:1.3fr .9fr;gap:18px}.searchrow{display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:14px}.cart-row{display:grid;grid-template-columns:1fr 65px 85px 28px;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}.total{font-size:24px;font-weight:900;text-align:right;margin:16px 0}.toast{position:fixed;right:22px;bottom:22px;background:#17130d;color:#fff;padding:12px 16px;border-radius:9px;display:none;z-index:20}.toast.show{display:block}.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:20px;z-index:10}.modal.show{display:flex}.modalbox{width:min(680px,100%);max-height:90vh;overflow:auto;background:var(--card);border-radius:16px;padding:22px}.modalhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}.close{border:0;background:transparent;font-size:25px}.hint{font-size:12px;color:var(--muted);margin-top:5px}.scanner{display:flex;gap:8px;margin-top:10px}.scanner input{flex:1}@media(max-width:900px){.side{width:76px}.brand img{width:48px;height:48px}.brand small{display:none}.nav span{display:none}.main{margin-left:76px;width:calc(100% - 76px);padding:18px}.cards{grid-template-columns:repeat(2,1fr)}.bill-layout{grid-template-columns:1fr}}@media(max-width:560px){.cards,.grid,.grid.three{grid-template-columns:1fr}.top{gap:12px}.top .btn{display:none}.main{padding:12px}}
-
-.auth-screen{position:fixed;inset:0;background:#171513;display:flex;align-items:center;justify-content:center;padding:20px;z-index:9999}
-.auth-box{width:min(410px,100%);background:#fff;border-radius:22px;padding:30px;box-shadow:0 25px 70px rgba(0,0,0,.35);text-align:center}
-.auth-logo{width:105px;height:105px;object-fit:contain;border-radius:14px}.auth-box h1{margin:8px 0 2px}.auth-box p{color:#6d6875;margin:0 0 22px;font-size:13px}
-.auth-field{text-align:left;margin:12px 0}.auth-field label{display:block;font-size:12px;color:#6d6875;margin-bottom:5px}
-.auth-field input{width:100%;padding:12px;border:1px solid #ddd8e4;border-radius:10px;outline:none}
-.auth-field input:focus{border-color:#b8862f;box-shadow:0 0 0 3px #f7f0df}
-.auth-btn{width:100%;padding:12px;border:0;border-radius:10px;background:#b8862f;color:#fff;font-weight:700;cursor:pointer}
-.auth-error{color:#b91c1c;font-size:12px;min-height:16px;margin-top:10px}
 </style>
 </head>
 <body>
-<div id="authScreen" class="auth-screen">
-<div class="auth-box">
-<img src="poshak-logo.jpeg" class="auth-logo" alt="POSHAK">
-<h1>POSHAK</h1>
-<p>Retail Management</p>
-<form id="poshakLoginForm">
-<div class="auth-field"><label>Username</label><input id="poshakUsername" type="text" autocomplete="username" value="poshakadmin" required></div>
-<div class="auth-field"><label>Password</label><input id="poshakPassword" type="password" autocomplete="current-password" required></div>
-<button class="auth-btn" type="submit">Sign in</button>
-<div class="auth-error" id="poshakAuthError"></div>
-</form>
-</div>
-</div>
-<div class="app" style="display:none">
+<div class="app">
 <aside class="side">
   <div class="brand"><img src="poshak-logo.jpeg" alt="POSHAK logo"><small>RETAIL MANAGEMENT</small></div>
   <div class="nav">
@@ -44,7 +22,7 @@ button,input,select{font:inherit}button{cursor:pointer}.app{display:flex;min-hei
     <button onclick="showView('billing',this)">▤ <span>Billing</span></button>
     <button onclick="showView('products',this)">◇ <span>Products</span></button>
     <button onclick="showView('inventory',this)">▣ <span>Inventory</span></button>
-    <button onclick="showView('sales',this)">◷ <span>Sales</span></button><button onclick="poshakLogout()">⇥ <span>Logout</span></button>
+    <button onclick="showView('sales',this)">◷ <span>Sales</span></button>
   </div>
 </aside>
 
@@ -257,75 +235,7 @@ async function completeSale(){
  try{
   autoPrintWindow=window.open('', '_blank', 'width=420,height=700');
   if(autoPrintWindow){
-   autoPrintWindow.document.write('<!doctype html><html><head><title>POSHAK</title></head><body style="font-family:Arial,sans-serif;text-align:center;padding:30px"><h2>POSHAK</h2><p>Preparing bill...</p>
-<script>
-(function(){
-  const LOGIN_EMAIL='poshakadmin@poshak.local';
-
-  function ui(user){
-    const screen=document.getElementById('authScreen');
-    const app=document.querySelector('.app');
-    if(user){
-      screen.style.display='none';
-      app.style.display='flex';
-      if(typeof loadData==='function') loadData();
-    }else{
-      screen.style.display='flex';
-      app.style.display='none';
-    }
-  }
-
-  window.poshakLogout=async function(){
-    await db.auth.signOut();
-  };
-
-  async function boot(){
-    const {data,error}=await db.auth.getSession();
-    if(error){console.error(error);ui(null);return;}
-    ui(data.session?.user||null);
-
-    db.auth.onAuthStateChange((_event,session)=>{
-      ui(session?.user||null);
-    });
-
-    const form=document.getElementById('poshakLoginForm');
-    form.onsubmit=async function(e){
-      e.preventDefault();
-      const username=document.getElementById('poshakUsername').value.trim().toLowerCase();
-      const password=document.getElementById('poshakPassword').value;
-      const err=document.getElementById('poshakAuthError');
-      err.textContent='';
-
-      if(username!=='poshakadmin'){
-        err.textContent='Invalid username or password';
-        return;
-      }
-
-      const result=await db.auth.signInWithPassword({
-        email:LOGIN_EMAIL,
-        password:password
-      });
-
-      if(result.error){
-        console.error('POSHAK login error:',result.error);
-        err.textContent=result.error.message;
-        return;
-      }
-
-      document.getElementById('poshakPassword').value='';
-      ui(result.data.user);
-    };
-  }
-
-  if(document.readyState==='loading'){
-    document.addEventListener('DOMContentLoaded',boot);
-  }else{
-    boot();
-  }
-})();
-</script>
-
-</body></html>');
+   autoPrintWindow.document.write('<!doctype html><html><head><title>POSHAK</title></head><body style="font-family:Arial,sans-serif;text-align:center;padding:30px"><h2>POSHAK</h2><p>Preparing bill...</p></body></html>');
    autoPrintWindow.document.close();
   }
   const billNumber='POS-'+new Date().toISOString().slice(0,10).replaceAll('-','')+'-'+String(Date.now()).slice(-6);
@@ -384,7 +294,7 @@ function printBarcode(){
  const img=canvas.toDataURL('image/png');
  const w=window.open('','_blank','width=520,height=420');
  if(!w){toast('Allow pop-ups to print barcode');return}
- w.document.write(`<html><head><title>POSHAK Barcode</title><style>body{font-family:Arial,sans-serif;text-align:center;padding:24px}img{max-width:100%}.name{font-weight:700;font-size:18px;margin-bottom:5px}.meta{font-size:13px;color:#555;margin-bottom:14px}@media print{body{padding:8px}}</style></head><body><div class="name">${esc(v.products?.name||'POSHAK Product')}</div><div class="meta">${esc([v.size,v.colour].filter(Boolean).join(' / '))} · MRP ₹${money(v.mrp)}</div><img src="${img}"><script>window.onload=()=>{window.print();setTimeout(()=>window.close(),500)}<\/script></body></html>`);
+ w.document.write(`<html><head><title>POSHAK Barcode</title><style>body{font-family:Arial,sans-serif;text-align:center;padding:24px}img{max-width:100%}.name{font-weight:700;font-size:18px;margin-bottom:5px}.meta{font-size:13px;color:#555;margin-bottom:14px}@media print{body{padding:8px}}</style></head><body><div class="name">${esc(v.products?.name||'POSHAK Product')}</div><div class="meta">${esc([v.size,v.colour].filter(Boolean).join(' / '))} · ${money(v.selling_price)}</div><img src="${img}"><script>window.onload=()=>{window.print();setTimeout(()=>window.close(),500)}<\/script></body></html>`);
  w.document.close();
 }
 let salesCache=[];
@@ -497,6 +407,8 @@ function exportSalesExcel(){
  XLSX.writeFile(wb,`POSHAK-Sales-${new Date().toISOString().slice(0,10)}.xlsx`);toast('Excel report downloaded');
 }
 
+
+loadData();
 </script>
 </body>
 </html>
