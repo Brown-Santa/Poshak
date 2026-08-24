@@ -71,6 +71,19 @@ button,input,select{font:inherit}button{cursor:pointer}.app{display:flex;min-hei
    <div id="billMatches"></div>
    <div class="scanner"><input id="scanInput" placeholder="Barcode scanner input"><button class="btn secondary" onclick="addByBarcode()">Add</button></div>
    <div class="hint">Most USB barcode scanners behave like a keyboard: scan into the box and press Enter.</div>
+   <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border,#e5e0d5)">
+    <h2 style="font-size:15px;margin:0 0 6px">Quick Add (no inventory)</h2>
+    <div class="hint" style="margin-bottom:10px">For items not yet added to Products — bill and print directly, without creating a catalog entry. Stock won't be tracked for these.</div>
+    <div class="grid">
+     <div><label>Article *</label><input id="qaName" placeholder="e.g. Slim Fit Jeans"></div>
+     <div><label>Brand</label><input id="qaBrand" placeholder="Brand"></div>
+     <div><label>Size</label><input id="qaSize" placeholder="e.g. 32 / M"></div>
+     <div><label>MRP</label><input id="qaMrp" type="number" step="0.01"></div>
+     <div><label>Selling price *</label><input id="qaSell" type="number" step="0.01"></div>
+     <div><label>Qty</label><input id="qaQty" type="number" min="1" value="1"></div>
+    </div>
+    <button class="btn secondary" style="width:100%;margin-top:10px" onclick="addQuickItem()">+ Add to Bill</button>
+   </div>
   </div>
   <div class="panel">
    <h2>Current Bill</h2>
@@ -317,6 +330,18 @@ function renderBillMatches(){
 function addByBarcode(){const code=document.getElementById('scanInput').value.trim();if(!code)return;const v=variants.find(x=>x.barcode===code||x.sku===code);if(!v){toast('Barcode/SKU not found');return}addToCart(v.id);document.getElementById('scanInput').value=''}
 document.getElementById('scanInput').addEventListener('keydown',e=>{if(e.key==='Enter')addByBarcode()});
 function startScanner(){document.getElementById('scanInput').focus();toast('Scanner ready — scan a barcode')}
+function addQuickItem(){
+ const name=document.getElementById('qaName').value.trim();
+ const brand=document.getElementById('qaBrand').value.trim();
+ const size=document.getElementById('qaSize').value.trim();
+ const mrp=Number(document.getElementById('qaMrp').value||0);
+ const sell=Number(document.getElementById('qaSell').value||0);
+ const qty=Math.max(1,Number(document.getElementById('qaQty').value||1));
+ if(!name||!sell){toast('Article name and Selling Price are required');return}
+ cart.push({id:'adhoc-'+Date.now()+Math.random().toString(36).slice(2,6),qty,adhoc:true,name,brand,size,mrp:mrp||sell,sell});
+ document.getElementById('qaName').value='';document.getElementById('qaBrand').value='';document.getElementById('qaSize').value='';document.getElementById('qaMrp').value='';document.getElementById('qaSell').value='';document.getElementById('qaQty').value='1';
+ renderCart();toast('Item added to bill');
+}
 function addToCart(id){
  const v=variants.find(x=>x.id===id);if(!v||v.stock_quantity<1){toast('Out of stock');return}
  const item=cart.find(x=>x.id===id);if(item){if(item.qty>=v.stock_quantity){toast('Not enough stock');return}item.qty++}else cart.push({id,qty:1});
@@ -324,10 +349,21 @@ function addToCart(id){
 }
 function renderCart(){
  const box=document.getElementById('cart');let total=0;
- box.innerHTML=cart.length?cart.map(c=>{const v=variants.find(x=>x.id===c.id),line=Number(v.selling_price)*c.qty;total+=line;return `<div class="cart-row"><div><b>${esc(v.products?.name||'')}</b><div class="hint">${esc(v.size||'')} ${esc(v.colour||'')}</div></div><input type="number" min="1" max="${v.stock_quantity}" value="${c.qty}" onchange="setCartQty('${c.id}',this.value)"><span>${money(line)}</span><button class="btn danger" style="padding:5px 8px" onclick="removeCart('${c.id}')">×</button></div>`}).join(''):`<div class="empty">No items added.</div>`;
+ box.innerHTML=cart.length?cart.map(c=>{
+  if(c.adhoc){
+   const line=Number(c.sell)*c.qty;total+=line;
+   return `<div class="cart-row"><div><b>${esc(c.name)}</b><div class="hint">${esc([c.brand,c.size].filter(Boolean).join(' · '))||'Quick item'}</div></div><input type="number" min="1" value="${c.qty}" onchange="setCartQty('${c.id}',this.value)"><span>${money(line)}</span><button class="btn danger" style="padding:5px 8px" onclick="removeCart('${c.id}')">×</button></div>`;
+  }
+  const v=variants.find(x=>x.id===c.id),line=Number(v.selling_price)*c.qty;total+=line;
+  return `<div class="cart-row"><div><b>${esc(v.products?.name||'')}</b><div class="hint">${esc(v.size||'')} ${esc(v.colour||'')}</div></div><input type="number" min="1" max="${v.stock_quantity}" value="${c.qty}" onchange="setCartQty('${c.id}',this.value)"><span>${money(line)}</span><button class="btn danger" style="padding:5px 8px" onclick="removeCart('${c.id}')">×</button></div>`;
+ }).join(''):`<div class="empty">No items added.</div>`;
  document.getElementById('cartTotal').textContent=money(total);
 }
-function setCartQty(id,n){const c=cart.find(x=>x.id===id),v=variants.find(x=>x.id===id);if(c)c.qty=Math.max(1,Math.min(Number(n)||1,v.stock_quantity));renderCart()}
+function setCartQty(id,n){
+ const c=cart.find(x=>x.id===id);if(!c)return;
+ if(c.adhoc){c.qty=Math.max(1,Number(n)||1)}else{const v=variants.find(x=>x.id===id);c.qty=Math.max(1,Math.min(Number(n)||1,v.stock_quantity))}
+ renderCart();
+}
 function removeCart(id){cart=cart.filter(x=>x.id!==id);renderCart()}
 async function completeSale(){
  if(!cart.length){toast('Add at least one item');return}
@@ -343,11 +379,21 @@ async function completeSale(){
   }
   const billNumber='POS-'+new Date().toISOString().slice(0,10).replaceAll('-','')+'-'+String(Date.now()).slice(-6);
   let subtotal=0;const items=[];
-  for(const c of cart){const v=variants.find(x=>x.id===c.id);if(!v||c.qty>v.stock_quantity)throw Error('Stock changed for an item. Refresh and try again.');const line=Number(v.selling_price)*c.qty;subtotal+=line;items.push({v,c,line})}
+  for(const c of cart){
+   if(c.adhoc){const line=Number(c.sell)*c.qty;subtotal+=line;items.push({adhoc:true,c,line});continue}
+   const v=variants.find(x=>x.id===c.id);if(!v||c.qty>v.stock_quantity)throw Error('Stock changed for an item. Refresh and try again.');
+   const line=Number(v.selling_price)*c.qty;subtotal+=line;items.push({v,c,line});
+  }
   const phone=document.getElementById('customerPhone').value.trim();let customer_id=null;
   if(phone){let r=await db.from('customers').select('id').eq('phone',phone).limit(1).maybeSingle();if(r.error)throw r.error;if(r.data)customer_id=r.data.id;else{r=await db.from('customers').insert({phone}).select('id').single();if(r.error)throw r.error;customer_id=r.data.id}}
   const r=await db.from('bills').insert({bill_number:billNumber,customer_id,subtotal,total:subtotal,payment_method:document.getElementById('payment').value,status:'completed'}).select().single();if(r.error)throw r.error;
   for(const x of items){
+   if(x.adhoc){
+    const c=x.c;const productName=(c.brand?c.brand+' - ':'')+c.name;
+    const rr=await db.from('bill_items').insert({bill_id:r.data.id,variant_id:null,product_name:productName,sku:null,barcode:null,size:c.size,colour:'',quantity:c.qty,mrp:c.mrp,selling_price:c.sell,line_total:x.line});
+    if(rr.error)throw rr.error;
+    continue;
+   }
    const v=x.v;let rr=await db.from('bill_items').insert({bill_id:r.data.id,variant_id:v.id,product_name:v.products?.name||'',sku:v.sku,barcode:v.barcode,size:v.size,colour:v.colour,quantity:x.c.qty,mrp:v.mrp,selling_price:v.selling_price,line_total:x.line});if(rr.error)throw rr.error;
    rr=await db.from('product_variants').update({stock_quantity:Number(v.stock_quantity)-x.c.qty}).eq('id',v.id).eq('stock_quantity',v.stock_quantity);if(rr.error)throw rr.error;
    await db.from('inventory_movements').insert({variant_id:v.id,movement_type:'sale',quantity:-x.c.qty,reference_id:r.data.id,notes:`Bill ${billNumber}`});
