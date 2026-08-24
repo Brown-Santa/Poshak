@@ -93,7 +93,7 @@ button,input,select{font:inherit}button{cursor:pointer}.app{display:flex;min-hei
  <form onsubmit="saveProduct(event)">
   <div class="grid">
    <div><label>Article name *</label><input id="pName" required placeholder="e.g. Slim Fit Jeans"></div>
-   <div><label>Category</label><select id="pCategory"><option>Shirts</option><option>T-Shirts</option><option>Polos</option><option>Jeans</option><option>Trousers</option><option>Formal Pants</option><option>DD Lowers</option><option>Shorts</option><option>Gym Wear</option><option>Sweatshirts</option><option>Jackets</option><option>Blazers</option><option>Briefs</option><option>Vests</option><option>Track Pants</option><option>Inner Wear</option><option>Ethnic Wear</option><option>Accessories</option><option>Others</option></select></div>
+   <div><label>Category</label><select id="pCategory"><option>Jeans</option><option>Shirts</option><option>T-Shirts</option><option>Others</option></select></div>
    <div><label>Brand</label><input id="pBrand" placeholder="Brand"></div>
    <div><label>Size</label><input id="pSize" placeholder="e.g. 32 / M / XL"></div>
    <div><label>Colour</label><input id="pColour" placeholder="e.g. Blue"></div>
@@ -118,6 +118,7 @@ button,input,select{font:inherit}button{cursor:pointer}.app{display:flex;min-hei
 
 <div id="barcodeModal" class="modal"><div class="modalbox" style="width:min(520px,100%);text-align:center">
  <div class="modalhead"><h2 style="margin:0">Product Barcode</h2><button class="close" onclick="closeModal('barcodeModal')">×</button></div>
+ <div style="font-weight:900;font-size:13px;letter-spacing:.14em;color:var(--accent)">POSHAK</div>
  <div id="barcodeLabelName" style="font-weight:800;font-size:17px;margin-bottom:4px"></div>
  <div id="barcodeLabelVariant" class="hint" style="margin-bottom:12px"></div>
  <canvas id="barcodeCanvas" style="max-width:100%;height:auto"></canvas>
@@ -280,7 +281,7 @@ async function generateBarcode(id){
  }
  currentBarcodeVariant=v;
  document.getElementById('barcodeLabelName').textContent=v.products?.name||'POSHAK Product';
- document.getElementById('barcodeLabelVariant').textContent=[v.size,v.colour].filter(Boolean).join(' / ')+' · '+money(v.selling_price);
+ document.getElementById('barcodeLabelVariant').textContent=[v.size,v.colour].filter(Boolean).join(' / ')+' · MRP '+money(v.mrp);
  document.getElementById('barcodeValue').textContent=v.barcode;
  document.getElementById('barcodeModal').classList.add('show');
  requestAnimationFrame(()=>{JsBarcode('#barcodeCanvas',v.barcode,{format:'CODE128',displayValue:true,lineColor:'#17130d',text:v.barcode,width:2,height:72,margin:12,fontSize:13});});
@@ -292,9 +293,9 @@ function printBarcode(){
  const v=currentBarcodeVariant;
  const canvas=document.getElementById('barcodeCanvas');
  const img=canvas.toDataURL('image/png');
- const w=window.open('','_blank','width=420,height=520');
+ const w=window.open('','_blank','width=520,height=420');
  if(!w){toast('Allow pop-ups to print barcode');return}
- w.document.write(`<html><head><title>POSHAK Barcode</title><style>body{font-family:Arial,sans-serif;text-align:center;padding:18px;margin:0}.brand{font-weight:900;font-size:24px;letter-spacing:1px;margin-bottom:4px}.name{font-weight:700;font-size:18px;margin-bottom:5px}.meta{font-size:13px;color:#555;margin-bottom:6px}.mrp{font-weight:800;font-size:16px;margin-bottom:10px}img{max-width:100%;height:auto}@media print{body{padding:6px}}</style></head><body><div class="brand">POSHAK</div><div class="name">${esc(v.products?.name||'POSHAK Product')}</div><div class="meta">${esc([v.size,v.colour].filter(Boolean).join(' / '))}</div><div class="mrp">MRP: ${money(v.mrp)}</div><img src="${img}"><div style="font-size:12px;margin-top:6px">${esc(v.barcode)}</div><script>window.onload=()=>{window.print();setTimeout(()=>window.close(),500)}<\/script></body></html>`);
+ w.document.write(`<html><head><title>POSHAK Barcode</title><style>body{font-family:Arial,sans-serif;text-align:center;padding:24px}img{max-width:100%}.brand{font-weight:900;font-size:15px;letter-spacing:.14em;color:#7b5a1d;margin-bottom:2px}.name{font-weight:700;font-size:18px;margin-bottom:5px}.meta{font-size:13px;color:#555;margin-bottom:14px}@media print{body{padding:8px}}</style></head><body><div class="brand">POSHAK</div><div class="name">${esc(v.products?.name||'POSHAK Product')}</div><div class="meta">${esc([v.size,v.colour].filter(Boolean).join(' / '))} · MRP ${money(v.mrp)}</div><img src="${img}"><script>window.onload=()=>{window.print();setTimeout(()=>window.close(),500)}<\/script></body></html>`);
  w.document.close();
 }
 let salesCache=[];
