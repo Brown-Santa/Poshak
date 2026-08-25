@@ -314,7 +314,7 @@ function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 function renderProducts(){
  const q=(document.getElementById('productSearch')?.value||'').toLowerCase();
  const rows=variants.filter(v=>(`${v.products?.name||''} ${v.sku||''} ${v.barcode||''} ${v.size||''} ${v.colour||''}`).toLowerCase().includes(q));
- document.getElementById('productRows').innerHTML=rows.length?rows.map(v=>`<tr><td><b>${esc(v.products?.name||'')}</b><div class="hint">${esc(v.products?.category||'')}</div></td><td>${esc(v.size||'—')} / ${esc(v.colour||'—')}</td><td>${esc(v.sku||'—')}</td><td>${esc(v.barcode||'—')}</td><td>${money(v.mrp)}</td><td>${money(v.selling_price)}</td><td>${Number(v.stock_quantity)}</td><td><button class="btn secondary" style="padding:6px 9px" onclick="generateBarcode('${v.id}')">${v.barcode?'Print':'Generate'}</button></td><td><button class="btn danger" style="padding:6px 9px" onclick="deleteVariant('${v.id}')">Delete</button></td></tr>`).join(''):`<tr><td colspan="9" class="empty">No products yet. Click + Add Product.</td></tr>`;
+ document.getElementById('productRows').innerHTML=rows.length?rows.map(v=>`<tr><td><b>${esc(v.products?.name||'')}</b><div class="hint">${esc(v.products?.category||'')}</div></td><td>${esc(v.size||'—')} / ${esc(v.colour||'—')}</td><td>${esc(v.sku||'—')}</td><td>${esc(v.barcode||'—')}</td><td>${money(v.mrp)}</td><td>${money(v.selling_price)}</td><td>${Number(v.stock_quantity)}</td><td><div class="actions" style="flex-wrap:wrap"><button class="btn secondary" style="padding:6px 9px" onclick="generateBarcode('${v.id}')">${v.barcode?'Print':'Generate'}</button><button class="btn secondary" style="padding:6px 9px" onclick="printMRPLabel('${v.id}')">MRP Tag</button></div></td><td><button class="btn danger" style="padding:6px 9px" onclick="deleteVariant('${v.id}')">Delete</button></td></tr>`).join(''):`<tr><td colspan="9" class="empty">No products yet. Click + Add Product.</td></tr>`;
 }
 function renderInventory(){
  document.getElementById('inventoryRows').innerHTML=variants.length?variants.map(v=>`<tr><td><b>${esc(v.products?.name||'')}</b></td><td>${esc(v.size||'—')}</td><td>${esc(v.colour||'—')}</td><td>${esc(v.sku||'—')}</td><td>${esc(v.barcode||'—')}</td><td class="${Number(v.stock_quantity)<=Number(v.reorder_level)?'low':''}">${v.stock_quantity}</td><td>${v.reorder_level}</td></tr>`).join(''):`<tr><td colspan="7" class="empty">No inventory yet.</td></tr>`;
@@ -468,6 +468,32 @@ async function generateBarcode(id){
  requestAnimationFrame(()=>{JsBarcode('#barcodeCanvas',v.barcode,{format:'CODE128',displayValue:true,lineColor:'#17130d',text:v.barcode,width:2,height:72,margin:12,fontSize:13});});
  await loadData();
  currentBarcodeVariant=variants.find(x=>x.id===id)||currentBarcodeVariant;
+}
+function printMRPLabel(id){
+ const v=variants.find(x=>x.id===id);if(!v){toast('Item not found');return}
+ const w=window.open('','_blank','width=420,height=320');
+ if(!w){toast('Allow pop-ups to print label');return}
+ w.document.write(`<html><head><title>POSHAK MRP Tag</title><style>
+  @page{size:50mm 25mm;margin:0}
+  *{box-sizing:border-box}
+  body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:0}
+  .label{width:50mm;height:25mm;padding:2mm 2.5mm;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}
+  .brand{font-weight:900;font-size:11px;letter-spacing:.16em;color:#000;margin-bottom:1mm}
+  .name{font-weight:700;font-size:9px;color:#111;margin-bottom:0.5mm;max-width:46mm;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .meta{font-size:7.5px;color:#333;margin-bottom:1.5mm}
+  .mrp{font-weight:900;font-size:17px;color:#000}
+  .mrp small{font-weight:700;font-size:9px;letter-spacing:.05em}
+  @media print{.label{width:50mm;height:25mm}}
+  </style></head><body>
+  <div class="label">
+   <div class="brand">POSHAK</div>
+   <div class="name">${esc(v.products?.name||'')}</div>
+   <div class="meta">${esc([v.size,v.colour].filter(Boolean).join(' / '))}</div>
+   <div class="mrp"><small>MRP</small> ${money(v.mrp)}</div>
+  </div>
+  <script>window.onload=()=>{window.print();setTimeout(()=>window.close(),500)}<\/script>
+  </body></html>`);
+ w.document.close();
 }
 function printBarcode(){
  if(!currentBarcodeVariant?.barcode)return;
