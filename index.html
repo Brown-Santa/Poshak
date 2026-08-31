@@ -34,6 +34,7 @@ button,input,select{font:inherit}button{cursor:pointer}.app{display:flex;min-hei
     <button onclick="showView('products',this)">◇ <span>Products</span></button>
     <button onclick="showView('inventory',this)">▣ <span>Inventory</span></button>
     <button onclick="showView('sales',this)">◷ <span>Sales</span></button>
+    <button onclick="showView('customers',this)">☺ <span>Customers</span></button>
   </div>
   <div style="position:absolute;bottom:16px;left:14px;right:14px">
     <button onclick="logout()" style="display:flex;width:100%;border:0;background:transparent;color:#ddd4c5;padding:12px 13px;border-radius:10px;text-align:left;gap:10px;align-items:center">⏻ <span>Logout</span></button>
@@ -112,6 +113,14 @@ button,input,select{font:inherit}button{cursor:pointer}.app{display:flex;min-hei
  <div class="panel"><h2>🐌 Duffer / Slow-Moving Products <span class="hint">Low or zero sales with stock remaining</span></h2><div id="duffers"></div></div>
  <div class="panel"><h2>Sales</h2><div class="table-wrap"><table class="table"><thead><tr><th>Bill</th><th>Date</th><th>Items</th><th>Payment</th><th>Total</th><th>Action</th></tr></thead><tbody id="salesRows"></tbody></table></div></div>
 </section>
+
+<section id="customers" class="view">
+ <div class="top"><div><h1>Customers</h1><div class="date">Phone numbers captured during billing</div></div><button class="btn secondary" onclick="exportCustomersExcel()">↓ Download Excel</button></div>
+ <div class="panel">
+  <input id="customerSearch" placeholder="Search by phone number…" oninput="renderCustomers()" style="margin-bottom:14px">
+  <div class="table-wrap"><table class="table"><thead><tr><th>Phone</th><th>Total Bills</th><th>Total Spent</th><th>Last Purchase</th></tr></thead><tbody id="customerRows"></tbody></table></div>
+ </div>
+</section>
 </main>
 </div>
 
@@ -175,7 +184,7 @@ let variants=[], products=[], cart=[], currentBarcodeVariant=null;
 
 function money(n){return '₹'+Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
-function showView(id,btn){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active'); if(id==='dashboard')loadDashboard();if(id==='products')renderProducts();if(id==='inventory')renderInventory();if(id==='sales')renderSales();if(id==='billing')renderBillMatches()}
+function showView(id,btn){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));if(btn)btn.classList.add('active'); if(id==='dashboard')loadDashboard();if(id==='products')renderProducts();if(id==='inventory')renderInventory();if(id==='sales')renderSales();if(id==='billing')renderBillMatches();if(id==='customers')renderCustomers()}
 function openProductModal(){document.getElementById('productModal').classList.add('show')}
 function openStockModal(){fillStockVariants();document.getElementById('stockModal').classList.add('show')}
 async function deleteVariant(id){
@@ -291,6 +300,46 @@ async function handleImportFile(e){
  if(added)await loadData();
 }
 function closeModal(id){document.getElementById(id).classList.remove('show')}
+let customerCache=[];
+async function renderCustomers(){
+ const search=(document.getElementById('customerSearch').value||'').trim();
+ const body=document.getElementById('customerRows');
+ body.innerHTML='<tr><td colspan="4" class="empty">Loading…</td></tr>';
+ let q=db.from('customers').select('id,phone,created_at').order('created_at',{ascending:false});
+ if(search)q=q.ilike('phone',`%${search}%`);
+ const {data:customers,error:ce}=await q;
+ if(ce){body.innerHTML=`<tr><td colspan="4" class="empty">${esc(ce.message)}</td></tr>`;return}
+ if(!customers||!customers.length){body.innerHTML='<tr><td colspan="4" class="empty">No customers found.</td></tr>';customerCache=[];return}
+ const ids=customers.map(c=>c.id);
+ const {data:bills,error:be}=await db.from('bills').select('customer_id,total,created_at').in('customer_id',ids).eq('status','completed');
+ if(be){body.innerHTML=`<tr><td colspan="4" class="empty">${esc(be.message)}</td></tr>`;return}
+ const stats={};
+ for(const b of bills||[]){
+  const s=stats[b.customer_id]||(stats[b.customer_id]={count:0,total:0,last:null});
+  s.count++;s.total+=Number(b.total||0);
+  if(!s.last||new Date(b.created_at)>new Date(s.last))s.last=b.created_at;
+ }
+ customerCache=customers.map(c=>{
+  const s=stats[c.id]||{count:0,total:0,last:null};
+  return {phone:c.phone,count:s.count,total:s.total,last:s.last,created_at:c.created_at};
+ });
+ body.innerHTML=customerCache.map(c=>`<tr><td><b>${esc(c.phone)}</b></td><td>${c.count}</td><td>${money(c.total)}</td><td>${c.last?new Date(c.last).toLocaleDateString('en-IN'):'—'}</td></tr>`).join('');
+}
+function exportCustomersExcel(){
+ if(!customerCache.length){toast('No customers to export');return}
+ if(typeof XLSX==='undefined'){toast('Excel library not loaded');return}
+ const rows=customerCache.map(c=>({
+  'Phone Number':c.phone,
+  'Total Bills':c.count,
+  'Total Spent':c.total,
+  'Last Purchase':c.last?new Date(c.last).toLocaleDateString('en-IN'):'',
+  'Customer Since':c.created_at?new Date(c.created_at).toLocaleDateString('en-IN'):''
+ }));
+ const wb=XLSX.utils.book_new();
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Customers');
+ XLSX.writeFile(wb,`POSHAK-Customers-${new Date().toISOString().slice(0,10)}.xlsx`);
+ toast('Excel downloaded');
+}
 async function loadData(){
  const [pr,vr]=await Promise.all([
    db.from('products').select('*').order('name'),
