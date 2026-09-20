@@ -549,9 +549,27 @@ function printBarcode(){
  const v=currentBarcodeVariant;
  const canvas=document.getElementById('barcodeCanvas');
  const img=canvas.toDataURL('image/png');
- const w=window.open('','_blank','width=520,height=420');
+ const w=window.open('','_blank','width=420,height=320');
  if(!w){toast('Allow pop-ups to print barcode');return}
- w.document.write(`<html><head><title>POSHAK Barcode</title><style>body{font-family:Arial,sans-serif;text-align:center;padding:24px}img{max-width:100%}.brand{font-weight:900;font-size:15px;letter-spacing:.14em;color:#7b5a1d;margin-bottom:2px}.name{font-weight:700;font-size:18px;margin-bottom:5px}.meta{font-size:13px;color:#555;margin-bottom:14px}@media print{body{padding:8px}}</style></head><body><div class="brand">POSHAK</div><div class="name">${esc(v.products?.name||'POSHAK Product')}</div><div class="meta">${esc([v.size,v.colour].filter(Boolean).join(' / '))} · MRP ${money(v.mrp)}</div><img src="${img}"><script>window.onload=()=>{window.print();setTimeout(()=>window.close(),500)}<\/script></body></html>`);
+ w.document.write(`<html><head><title>POSHAK Barcode</title><style>
+  @page{size:50mm 25mm;margin:0}
+  *{box-sizing:border-box}
+  body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:0}
+  .label{width:50mm;height:25mm;padding:1mm 2.5mm;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;overflow:hidden}
+  .brand{font-weight:900;font-size:9px;letter-spacing:.14em;color:#000;margin-bottom:0.3mm}
+  .name{font-weight:700;font-size:8px;color:#111;margin-bottom:0.3mm;max-width:46mm;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .meta{font-size:7px;color:#333;margin-bottom:0.5mm}
+  img{max-width:44mm;max-height:11mm}
+  @media print{.label{width:50mm;height:25mm}}
+  </style></head><body>
+  <div class="label">
+   <div class="brand">POSHAK</div>
+   <div class="name">${esc(v.products?.name||'POSHAK Product')}</div>
+   <div class="meta">${esc([v.size,v.colour].filter(Boolean).join(' / '))} · MRP ${money(v.mrp)}</div>
+   <img src="${img}">
+  </div>
+  <script>window.onload=()=>{window.print();setTimeout(()=>window.close(),500)}<\/script>
+  </body></html>`);
  w.document.close();
 }
 let salesCache=[];
