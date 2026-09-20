@@ -55,7 +55,7 @@ button,input,select{font:inherit}button{cursor:pointer}.app{display:flex;min-hei
 
 <section id="products" class="view">
  <div class="top"><div><h1>Products</h1><div class="date">Manage articles and variants</div></div><div style="display:flex;gap:10px"><button class="btn secondary" onclick="downloadImportTemplate()">⭳ Template</button><button class="btn secondary" onclick="openModal('importModal')">⭱ Import Excel</button><button class="btn" onclick="openProductModal()">+ Add Product</button></div></div>
- <div class="panel"><div class="actions" style="margin-bottom:14px"><input id="productSearch" placeholder="Search product, SKU or barcode…" oninput="renderProducts()"></div><div class="table-wrap"><table class="table"><thead><tr><th>Article</th><th>Variant</th><th>SKU</th><th>Barcode</th><th>MRP</th><th>Selling</th><th>Stock</th><th>Barcode</th><th>Action</th></tr></thead><tbody id="productRows"></tbody></table></div></div>
+ <div class="panel"><div class="actions" style="margin-bottom:14px;flex-wrap:wrap"><input id="productSearch" placeholder="Search product, SKU or barcode…" oninput="renderProducts()"><button class="btn secondary" onclick="printSelectedBarcodes()">Print Selected Barcodes</button><button class="btn secondary" onclick="printSelectedMrpTags()">Print Selected MRP Tags</button></div><div class="hint" style="margin-bottom:10px">Tick items below and set Qty, then print — labels fill both panels (100x25mm, 2-up) so paper isn't wasted.</div><div class="table-wrap"><table class="table"><thead><tr><th><input type="checkbox" onchange="toggleSelectAllProducts(this)"></th><th>Qty</th><th>Article</th><th>Variant</th><th>SKU</th><th>Barcode</th><th>MRP</th><th>Selling</th><th>Stock</th><th>Barcode</th><th>Action</th></tr></thead><tbody id="productRows"></tbody></table></div></div>
 </section>
 
 <section id="inventory" class="view">
@@ -363,7 +363,7 @@ function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 function renderProducts(){
  const q=(document.getElementById('productSearch')?.value||'').toLowerCase();
  const rows=variants.filter(v=>(`${v.products?.name||''} ${v.sku||''} ${v.barcode||''} ${v.size||''} ${v.colour||''}`).toLowerCase().includes(q));
- document.getElementById('productRows').innerHTML=rows.length?rows.map(v=>`<tr><td><b>${esc(v.products?.name||'')}</b><div class="hint">${esc(v.products?.category||'')}</div></td><td>${esc(v.size||'—')} / ${esc(v.colour||'—')}</td><td>${esc(v.sku||'—')}</td><td>${esc(v.barcode||'—')}</td><td>${money(v.mrp)}</td><td>${money(v.selling_price)}</td><td>${Number(v.stock_quantity)}</td><td><div class="actions" style="flex-wrap:wrap"><button class="btn secondary" style="padding:6px 9px" onclick="generateBarcode('${v.id}')">${v.barcode?'Print':'Generate'}</button><button class="btn secondary" style="padding:6px 9px" onclick="printMRPLabel('${v.id}')">MRP Tag</button></div></td><td><button class="btn danger" style="padding:6px 9px" onclick="deleteVariant('${v.id}')">Delete</button></td></tr>`).join(''):`<tr><td colspan="9" class="empty">No products yet. Click + Add Product.</td></tr>`;
+ document.getElementById('productRows').innerHTML=rows.length?rows.map(v=>`<tr><td><input type="checkbox" class="printSelect" value="${v.id}"></td><td><input type="number" class="printQty" data-id="${v.id}" value="1" min="1" style="width:48px"></td><td><b>${esc(v.products?.name||'')}</b><div class="hint">${esc(v.products?.category||'')}</div></td><td>${esc(v.size||'—')} / ${esc(v.colour||'—')}</td><td>${esc(v.sku||'—')}</td><td>${esc(v.barcode||'—')}</td><td>${money(v.mrp)}</td><td>${money(v.selling_price)}</td><td>${Number(v.stock_quantity)}</td><td><div class="actions" style="flex-wrap:wrap"><button class="btn secondary" style="padding:6px 9px" onclick="generateBarcode('${v.id}')">${v.barcode?'Print':'Generate'}</button><button class="btn secondary" style="padding:6px 9px" onclick="printMRPLabel('${v.id}')">MRP Tag</button></div></td><td><button class="btn danger" style="padding:6px 9px" onclick="deleteVariant('${v.id}')">Delete</button></td></tr>`).join(''):`<tr><td colspan="11" class="empty">No products yet. Click + Add Product.</td></tr>`;
 }
 function renderInventory(){
  document.getElementById('inventoryRows').innerHTML=variants.length?variants.map(v=>`<tr><td><b>${esc(v.products?.name||'')}</b></td><td>${esc(v.size||'—')}</td><td>${esc(v.colour||'—')}</td><td>${esc(v.sku||'—')}</td><td>${esc(v.barcode||'—')}</td><td class="${Number(v.stock_quantity)<=Number(v.reorder_level)?'low':''}">${v.stock_quantity}</td><td>${v.reorder_level}</td></tr>`).join(''):`<tr><td colspan="7" class="empty">No inventory yet.</td></tr>`;
@@ -518,59 +518,94 @@ async function generateBarcode(id){
  await loadData();
  currentBarcodeVariant=variants.find(x=>x.id===id)||currentBarcodeVariant;
 }
-function printMRPLabel(id){
- const v=variants.find(x=>x.id===id);if(!v){toast('Item not found');return}
- const w=window.open('','_blank','width=420,height=320');
- if(!w){toast('Allow pop-ups to print label');return}
- w.document.write(`<html><head><title>POSHAK MRP Tag</title><style>
-  @page{size:50mm 25mm;margin:0}
-  *{box-sizing:border-box}
-  body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:0}
-  .label{width:50mm;height:25mm;padding:2mm 2.5mm;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}
-  .brand{font-weight:900;font-size:11px;letter-spacing:.16em;color:#000;margin-bottom:1mm}
-  .name{font-weight:700;font-size:9px;color:#111;margin-bottom:0.5mm;max-width:46mm;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .meta{font-size:7.5px;color:#333;margin-bottom:1.5mm}
-  .mrp{font-weight:900;font-size:17px;color:#000}
-  .mrp small{font-weight:700;font-size:9px;letter-spacing:.05em}
-  @media print{.label{width:50mm;height:25mm}}
-  </style></head><body>
-  <div class="label">
+// ---- shared 2-panel (100mm x 25mm) label print engine ----
+// The physical roll is 100mm wide with a die-cut down the middle: two 50mm
+// panels per row. Every print job below is built against the FULL 100mm
+// width and fills panels left-to-right, top-to-bottom, so a single label
+// always lands in the left panel (never centered across the die-cut), and
+// printing several at once fills both panels instead of wasting the second.
+
+function makeBarcodeImg(barcodeValue){
+ const c=document.createElement('canvas');
+ JsBarcode(c,barcodeValue,{format:'CODE128',displayValue:true,lineColor:'#000',width:1.1,height:22,margin:0,fontSize:8});
+ return c.toDataURL('image/png');
+}
+function barcodeCellHtml(v){
+ const img=makeBarcodeImg(v.barcode);
+ return `<div class="cell">
+   <div class="name">${esc(v.products?.name||'POSHAK Product')}</div>
+   <div class="meta">${esc([v.size,v.colour].filter(Boolean).join(' / '))} · MRP ${money(v.mrp)}</div>
+   <img src="${img}">
+  </div>`;
+}
+function mrpCellHtml(v){
+ return `<div class="cell">
    <div class="brand">POSHAK</div>
    <div class="name">${esc(v.products?.name||'')}</div>
    <div class="meta">${esc([v.size,v.colour].filter(Boolean).join(' / '))}</div>
    <div class="mrp"><small>MRP</small> ${money(v.mrp)}</div>
-  </div>
+  </div>`;
+}
+function openLabelPrintWindow(cells){
+ if(!cells.length){toast('Nothing to print');return}
+ const rows=[];
+ for(let i=0;i<cells.length;i+=2){
+  rows.push(`<div class="row">${cells[i]}${cells[i+1]||'<div class="cell"></div>'}</div>`);
+ }
+ const w=window.open('','_blank','width=420,height=320');
+ if(!w){toast('Allow pop-ups to print');return}
+ w.document.write(`<html><head><title>POSHAK Labels</title><style>
+  @page{size:100mm 25mm;margin:0}
+  *{box-sizing:border-box}
+  body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:0}
+  .row{width:100mm;height:25mm;display:flex;page-break-after:always}
+  .row:last-child{page-break-after:auto}
+  .cell{width:50mm;height:25mm;padding:1mm 2.5mm;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;overflow:hidden}
+  .brand{font-weight:900;font-size:11px;letter-spacing:.16em;color:#000;margin-bottom:1mm}
+  .name{font-weight:700;font-size:8px;color:#111;margin-bottom:0.3mm;max-width:46mm;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .meta{font-size:7px;color:#333;margin-bottom:0.5mm}
+  .mrp{font-weight:900;font-size:17px;color:#000}
+  .mrp small{font-weight:700;font-size:9px;letter-spacing:.05em}
+  img{width:32mm;height:auto;display:block}
+  </style></head><body>${rows.join('')}
   <script>window.onload=()=>{window.print();setTimeout(()=>window.close(),500)}<\/script>
   </body></html>`);
  w.document.close();
 }
+
+function printMRPLabel(id){
+ const v=variants.find(x=>x.id===id);if(!v){toast('Item not found');return}
+ openLabelPrintWindow([mrpCellHtml(v)]);
+}
 function printBarcode(){
  if(!currentBarcodeVariant?.barcode)return;
- const v=currentBarcodeVariant;
- // build a small, print-only barcode instead of reusing the big modal canvas
- const printCanvas=document.createElement('canvas');
- JsBarcode(printCanvas,v.barcode,{format:'CODE128',displayValue:true,lineColor:'#000',width:1.1,height:22,margin:0,fontSize:8});
- const img=printCanvas.toDataURL('image/png');
- const w=window.open('','_blank','width=420,height=320');
- if(!w){toast('Allow pop-ups to print barcode');return}
- w.document.write(`<html><head><title>POSHAK Barcode</title><style>
-  @page{size:50mm 25mm;margin:0}
-  *{box-sizing:border-box}
-  body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:0}
-  .label{width:50mm;height:25mm;padding:1mm 2.5mm;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;overflow:hidden}
-  .name{font-weight:700;font-size:8px;color:#111;margin-bottom:0.3mm;max-width:46mm;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .meta{font-size:7px;color:#333;margin-bottom:0.5mm}
-  img{width:32mm;height:auto;display:block}
-  @media print{.label{width:50mm;height:25mm}}
-  </style></head><body>
-  <div class="label">
-   <div class="name">${esc(v.products?.name||'POSHAK Product')}</div>
-   <div class="meta">${esc([v.size,v.colour].filter(Boolean).join(' / '))} · MRP ${money(v.mrp)}</div>
-   <img src="${img}">
-  </div>
-  <script>window.onload=()=>{window.print();setTimeout(()=>window.close(),500)}<\/script>
-  </body></html>`);
- w.document.close();
+ openLabelPrintWindow([barcodeCellHtml(currentBarcodeVariant)]);
+}
+
+// ---- bulk / multi-select printing (fills both panels, avoids waste) ----
+function getSelectedPrintItems(){
+ const boxes=[...document.querySelectorAll('.printSelect:checked')];
+ const items=[];
+ boxes.forEach(b=>{
+  const v=variants.find(x=>x.id===b.value);if(!v)return;
+  const qtyEl=document.querySelector(`.printQty[data-id="${b.value}"]`);
+  const qty=Math.max(1,parseInt(qtyEl?.value||'1',10)||1);
+  for(let i=0;i<qty;i++)items.push(v);
+ });
+ return items;
+}
+function printSelectedBarcodes(){
+ const items=getSelectedPrintItems().filter(v=>v.barcode);
+ if(!items.length){toast('Select at least one item with a barcode');return}
+ openLabelPrintWindow(items.map(barcodeCellHtml));
+}
+function printSelectedMrpTags(){
+ const items=getSelectedPrintItems();
+ if(!items.length){toast('Select at least one item');return}
+ openLabelPrintWindow(items.map(mrpCellHtml));
+}
+function toggleSelectAllProducts(cb){
+ document.querySelectorAll('.printSelect').forEach(b=>b.checked=cb.checked);
 }
 let salesCache=[];
 let selectedBillId=null;
