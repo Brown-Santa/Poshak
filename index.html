@@ -68,10 +68,16 @@ button,input,select{font:inherit}button{cursor:pointer}.app{display:flex;min-hei
  <div class="bill-layout">
   <div class="panel">
    <h2>Add item</h2>
-   <div class="searchrow"><input id="billSearch" placeholder="Search article / SKU / barcode…" oninput="renderBillMatches()"><button class="btn secondary" onclick="startScanner()">Scan</button></div>
+   <div class="searchrow"><input id="billSearch" placeholder="Search article / SKU / barcode…" oninput="renderBillMatches()"><button class="btn secondary" onclick="startScanner()">Scan</button><button class="btn secondary" onclick="openCameraScanner()">📷 Scan via Camera</button></div>
    <div id="billMatches"></div>
    <div class="scanner"><input id="scanInput" placeholder="Barcode scanner input"><button class="btn secondary" onclick="addByBarcode()">Add</button></div>
-   <div class="hint">Most USB barcode scanners behave like a keyboard: scan into the box and press Enter.</div>
+   <div class="hint">USB barcode scanner: scan into the box above and press Enter. No scanner? Use "Scan via Camera" — works with your phone or laptop camera, no extra hardware needed.</div>
+   <div id="cameraScanModal" class="modal"><div class="modalbox" style="width:min(420px,100%);text-align:center">
+    <div class="modalhead"><h2 style="margin:0">Scan via Camera</h2><button class="close" onclick="closeCameraScanner()">×</button></div>
+    <video id="cameraScanVideo" style="width:100%;border-radius:8px;background:#000" playsinline muted></video>
+    <div id="cameraScanStatus" class="hint" style="margin-top:8px">Point the camera at a barcode…</div>
+    <button class="btn secondary" style="margin-top:12px" onclick="closeCameraScanner()">Close</button>
+   </div></div>
    <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border,#e5e0d5)">
     <h2 style="font-size:15px;margin:0 0 6px">Quick Add (no inventory)</h2>
     <div class="hint" style="margin-bottom:10px">For items not yet added to Products — bill and print directly, without creating a catalog entry. Stock won't be tracked for these.</div>
@@ -412,6 +418,58 @@ function renderBillMatches(){
 function addByBarcode(){const code=document.getElementById('scanInput').value.trim();if(!code)return;const v=variants.find(x=>x.barcode===code||x.sku===code);if(!v){toast('Barcode/SKU not found');return}addToCart(v.id);document.getElementById('scanInput').value=''}
 document.getElementById('scanInput').addEventListener('keydown',e=>{if(e.key==='Enter')addByBarcode()});
 function startScanner(){document.getElementById('scanInput').focus();toast('Scanner ready — scan a barcode')}
+
+// ---- camera-based barcode scanning (no USB scanner needed) ----
+let cameraScanStream=null,cameraScanRAF=null,cameraScanDetector=null,cameraScanBusy=false;
+async function openCameraScanner(){
+ const modal=document.getElementById('cameraScanModal');
+ const video=document.getElementById('cameraScanVideo');
+ const status=document.getElementById('cameraScanStatus');
+ modal.classList.add('show');
+ status.textContent='Starting camera…';
+ if(!('BarcodeDetector' in window)){
+  status.textContent='Your browser doesn\'t support camera scanning. Use Chrome (Android/desktop) or the USB scanner box instead.';
+  return;
+ }
+ try{
+  cameraScanDetector=new BarcodeDetector({formats:['code_128','ean_13','ean_8','upc_a','upc_e','code_39']});
+  cameraScanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+  video.srcObject=cameraScanStream;
+  await video.play();
+  status.textContent='Point the camera at a barcode…';
+  cameraScanLoop(video,status);
+ }catch(e){
+  status.textContent='Could not open camera: '+(e.message||e);
+ }
+}
+async function cameraScanLoop(video,status){
+ if(!cameraScanStream)return;
+ try{
+  if(!cameraScanBusy && video.readyState>=2){
+   cameraScanBusy=true;
+   const codes=await cameraScanDetector.detect(video);
+   if(codes && codes.length){
+    const value=codes[0].rawValue;
+    const v=variants.find(x=>x.barcode===value||x.sku===value);
+    if(v){
+     addToCart(v.id);
+     toast(`Added: ${v.products?.name||''}`);
+     status.textContent=`✓ Added ${v.products?.name||''} — scan next item`;
+    }else{
+     status.textContent=`Barcode "${value}" not found in inventory`;
+    }
+   }
+   cameraScanBusy=false;
+  }
+ }catch(e){cameraScanBusy=false}
+ cameraScanRAF=requestAnimationFrame(()=>cameraScanLoop(video,status));
+}
+function closeCameraScanner(){
+ document.getElementById('cameraScanModal').classList.remove('show');
+ if(cameraScanRAF)cancelAnimationFrame(cameraScanRAF);
+ cameraScanRAF=null;
+ if(cameraScanStream){cameraScanStream.getTracks().forEach(t=>t.stop());cameraScanStream=null}
+}
 function addQuickItem(){
  const name=document.getElementById('qaName').value.trim();
  const brand=document.getElementById('qaBrand').value.trim();
@@ -518,6 +576,53 @@ async function generateBarcode(id){
  await loadData();
  currentBarcodeVariant=variants.find(x=>x.id===id)||currentBarcodeVariant;
 }
+// ---- raw TSPL print bridge (bypasses the browser print dialog / Windows
+// GDI driver, which was rotating and misaligning labels). Falls back to the
+// old HTML print-window approach automatically if the bridge isn't running.
+// See poshak-print-bridge.js for the one-time local setup. ----
+const PRINT_BRIDGE_URL='http://127.0.0.1:9123';
+async function printBridgeAvailable(){
+ try{
+  const ctrl=new AbortController();
+  const t=setTimeout(()=>ctrl.abort(),700);
+  const r=await fetch(PRINT_BRIDGE_URL+'/status',{signal:ctrl.signal});
+  clearTimeout(t);
+  return r.ok;
+ }catch(e){return false}
+}
+function tsplEscape(s){return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/"/g,'\\"')}
+// items: array of up to 2 cell objects per row -> {name, meta, barcode, mrpBig}
+// (mrpBig = big MRP text for MRP-tag style cells; barcode = code128 value for barcode-style cells)
+function tsplBuildJob(rows){
+ let cmd='SIZE 100 mm,25 mm\r\nGAP 2 mm,0 mm\r\nDIRECTION 1\r\nREFERENCE 0,0\r\nDENSITY 8\r\nSPEED 4\r\n';
+ rows.forEach(items=>{
+  cmd+='CLS\r\n';
+  items.forEach((it,idx)=>{
+   if(!it)return;
+   const xOff=idx===0?24:424; // dots (203dpi, 8 dots/mm): panel 0 and panel 1 (50mm=400 dots) + small pad
+   let y=16;
+   cmd+=`TEXT ${xOff},${y},"3",0,1,1,"${tsplEscape(it.name)}"\r\n`;
+   y+=28;
+   cmd+=`TEXT ${xOff},${y},"1",0,1,1,"${tsplEscape(it.meta)}"\r\n`;
+   y+=24;
+   if(it.mrpBig)cmd+=`TEXT ${xOff},${y+6},"4",0,1,1,"MRP ${tsplEscape(it.mrpBig)}"\r\n`;
+   if(it.barcode)cmd+=`BARCODE ${xOff},${y},"128",40,1,0,2,2,"${tsplEscape(it.barcode)}"\r\n`;
+  });
+  cmd+='PRINT 1,1\r\n';
+ });
+ return cmd;
+}
+async function printViaBridge(cells){
+ // cells already built by barcodeCellData/mrpCellData (plain data, not HTML)
+ const rows=[];
+ for(let i=0;i<cells.length;i+=2)rows.push([cells[i],cells[i+1]||null]);
+ const tspl=tsplBuildJob(rows);
+ const res=await fetch(PRINT_BRIDGE_URL+'/print',{method:'POST',headers:{'Content-Type':'text/plain'},body:tspl});
+ if(!res.ok)throw new Error('bridge print failed');
+}
+function barcodeCellData(v){return {name:v.products?.name||'POSHAK Product',meta:[v.size,v.colour].filter(Boolean).join(' / ')+' · MRP '+money(v.mrp),barcode:v.barcode}}
+function mrpCellData(v){return {name:v.products?.name||'',meta:[v.size,v.colour].filter(Boolean).join(' / '),mrpBig:money(v.mrp)}}
+
 // ---- shared 2-panel (100mm x 25mm) label print engine ----
 // The physical roll is 100mm wide with a die-cut down the middle: two 50mm
 // panels per row. Every print job below is built against the FULL 100mm
@@ -573,13 +678,20 @@ function openLabelPrintWindow(cells){
  w.document.close();
 }
 
-function printMRPLabel(id){
+async function printMRPLabel(id){
  const v=variants.find(x=>x.id===id);if(!v){toast('Item not found');return}
+ if(await printBridgeAvailable()){
+  try{await printViaBridge([mrpCellData(v)]);toast('Sent to printer');return}catch(e){toast('Bridge print failed, using browser print')}
+ }
  openLabelPrintWindow([mrpCellHtml(v)]);
 }
-function printBarcode(){
+async function printBarcode(){
  if(!currentBarcodeVariant?.barcode)return;
- openLabelPrintWindow([barcodeCellHtml(currentBarcodeVariant)]);
+ const v=currentBarcodeVariant;
+ if(await printBridgeAvailable()){
+  try{await printViaBridge([barcodeCellData(v)]);toast('Sent to printer');return}catch(e){toast('Bridge print failed, using browser print')}
+ }
+ openLabelPrintWindow([barcodeCellHtml(v)]);
 }
 
 // ---- bulk / multi-select printing (fills both panels, avoids waste) ----
@@ -594,14 +706,20 @@ function getSelectedPrintItems(){
  });
  return items;
 }
-function printSelectedBarcodes(){
+async function printSelectedBarcodes(){
  const items=getSelectedPrintItems().filter(v=>v.barcode);
  if(!items.length){toast('Select at least one item with a barcode');return}
+ if(await printBridgeAvailable()){
+  try{await printViaBridge(items.map(barcodeCellData));toast(`Sent ${items.length} label(s) to printer`);return}catch(e){toast('Bridge print failed, using browser print')}
+ }
  openLabelPrintWindow(items.map(barcodeCellHtml));
 }
-function printSelectedMrpTags(){
+async function printSelectedMrpTags(){
  const items=getSelectedPrintItems();
  if(!items.length){toast('Select at least one item');return}
+ if(await printBridgeAvailable()){
+  try{await printViaBridge(items.map(mrpCellData));toast(`Sent ${items.length} label(s) to printer`);return}catch(e){toast('Bridge print failed, using browser print')}
+ }
  openLabelPrintWindow(items.map(mrpCellHtml));
 }
 function toggleSelectAllProducts(cb){
