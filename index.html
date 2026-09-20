@@ -432,7 +432,7 @@ async function openCameraScanner(){
   return;
  }
  try{
-  cameraScanDetector=new BarcodeDetector({formats:['code_128','ean_13','ean_8','upc_a','upc_e','code_39']});
+  cameraScanDetector=new BarcodeDetector({formats:['code_128']});
   cameraScanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
   video.srcObject=cameraScanStream;
   await video.play();
@@ -449,7 +449,7 @@ async function cameraScanLoop(video,status){
    cameraScanBusy=true;
    const codes=await cameraScanDetector.detect(video);
    if(codes && codes.length){
-    const value=codes[0].rawValue;
+    const value=(codes[0].rawValue||'').trim();
     const v=variants.find(x=>x.barcode===value||x.sku===value);
     if(v){
      addToCart(v.id);
@@ -632,7 +632,7 @@ function mrpCellData(v){return {name:v.products?.name||'',meta:[v.size,v.colour]
 
 function makeBarcodeImg(barcodeValue){
  const c=document.createElement('canvas');
- JsBarcode(c,barcodeValue,{format:'CODE128',displayValue:true,lineColor:'#000',width:1.1,height:22,margin:0,fontSize:8});
+ JsBarcode(c,barcodeValue,{format:'CODE128',displayValue:true,lineColor:'#000',width:1.1,height:22,margin:6,fontSize:8});
  return c.toDataURL('image/png');
 }
 function barcodeCellHtml(v){
