@@ -98,8 +98,12 @@ button,input,select{font:inherit}button{cursor:pointer}.app{display:flex;min-hei
    <div class="total" id="cartTotal">₹0.00</div>
    <div class="grid">
     <div><label>Payment</label><select id="payment"><option value="cash">Cash</option><option value="upi">UPI</option><option value="card">Card</option><option value="credit">Credit</option><option value="other">Other</option></select></div>
+    <div><label>Salesman</label><select id="salesman"><option value="">— Select —</option><option>Akash</option><option>Bhupendra</option><option>Siddhansh</option><option>Kunal</option></select></div>
     <div><label>Customer phone (optional)</label><input id="customerPhone"></div>
+    <div><label>Customer name (optional)</label><input id="customerName"></div>
+    <div><label>Customer DOB (optional)</label><input id="customerDob" placeholder="DD/MM/YYYY"></div>
    </div>
+   <div class="hint" style="margin-top:6px">Customer name, DOB and salesman are recorded internally for your records — they do not appear on the printed bill.</div>
    <button class="btn" style="width:100%;margin-top:14px" id="completeBill" onclick="completeSale()">Complete Bill</button>
   </div>
  </div>
@@ -117,14 +121,14 @@ button,input,select{font:inherit}button{cursor:pointer}.app{display:flex;min-hei
  </div>
  <div class="panel"><h2>🏆 Champion Products <span class="hint">Best sellers by article + size + colour</span></h2><div id="champions"></div></div>
  <div class="panel"><h2>🐌 Duffer / Slow-Moving Products <span class="hint">Low or zero sales with stock remaining</span></h2><div id="duffers"></div></div>
- <div class="panel"><h2>Sales</h2><div class="table-wrap"><table class="table"><thead><tr><th>Bill</th><th>Date</th><th>Items</th><th>Payment</th><th>Total</th><th>Action</th></tr></thead><tbody id="salesRows"></tbody></table></div></div>
+ <div class="panel"><h2>Sales</h2><div class="table-wrap"><table class="table"><thead><tr><th>Bill</th><th>Date</th><th>Items</th><th>Payment</th><th>Salesman</th><th>Total</th><th>Action</th></tr></thead><tbody id="salesRows"></tbody></table></div></div>
 </section>
 
 <section id="customers" class="view">
  <div class="top"><div><h1>Customers</h1><div class="date">Phone numbers captured during billing</div></div><button class="btn secondary" onclick="exportCustomersExcel()">↓ Download Excel</button></div>
  <div class="panel">
   <input id="customerSearch" placeholder="Search by phone number…" oninput="renderCustomers()" style="margin-bottom:14px">
-  <div class="table-wrap"><table class="table"><thead><tr><th>Phone</th><th>Total Bills</th><th>Total Spent</th><th>Last Purchase</th></tr></thead><tbody id="customerRows"></tbody></table></div>
+  <div class="table-wrap"><table class="table"><thead><tr><th>Phone</th><th>Name</th><th>DOB</th><th>Total Bills</th><th>Total Spent</th><th>Last Purchase</th></tr></thead><tbody id="customerRows"></tbody></table></div>
  </div>
 </section>
 </main>
@@ -310,15 +314,15 @@ let customerCache=[];
 async function renderCustomers(){
  const search=(document.getElementById('customerSearch').value||'').trim();
  const body=document.getElementById('customerRows');
- body.innerHTML='<tr><td colspan="4" class="empty">Loading…</td></tr>';
- let q=db.from('customers').select('id,phone,created_at').order('created_at',{ascending:false});
+ body.innerHTML='<tr><td colspan="6" class="empty">Loading…</td></tr>';
+ let q=db.from('customers').select('id,phone,name,date_of_birth,created_at').order('created_at',{ascending:false});
  if(search)q=q.ilike('phone',`%${search}%`);
  const {data:customers,error:ce}=await q;
- if(ce){body.innerHTML=`<tr><td colspan="4" class="empty">${esc(ce.message)}</td></tr>`;return}
- if(!customers||!customers.length){body.innerHTML='<tr><td colspan="4" class="empty">No customers found.</td></tr>';customerCache=[];return}
+ if(ce){body.innerHTML=`<tr><td colspan="6" class="empty">${esc(ce.message)}</td></tr>`;return}
+ if(!customers||!customers.length){body.innerHTML='<tr><td colspan="6" class="empty">No customers found.</td></tr>';customerCache=[];return}
  const ids=customers.map(c=>c.id);
  const {data:bills,error:be}=await db.from('bills').select('customer_id,total,created_at').in('customer_id',ids).eq('status','completed');
- if(be){body.innerHTML=`<tr><td colspan="4" class="empty">${esc(be.message)}</td></tr>`;return}
+ if(be){body.innerHTML=`<tr><td colspan="6" class="empty">${esc(be.message)}</td></tr>`;return}
  const stats={};
  for(const b of bills||[]){
   const s=stats[b.customer_id]||(stats[b.customer_id]={count:0,total:0,last:null});
@@ -327,15 +331,17 @@ async function renderCustomers(){
  }
  customerCache=customers.map(c=>{
   const s=stats[c.id]||{count:0,total:0,last:null};
-  return {phone:c.phone,count:s.count,total:s.total,last:s.last,created_at:c.created_at};
+  return {phone:c.phone,name:c.name,dob:c.date_of_birth,count:s.count,total:s.total,last:s.last,created_at:c.created_at};
  });
- body.innerHTML=customerCache.map(c=>`<tr><td><b>${esc(c.phone)}</b></td><td>${c.count}</td><td>${money(c.total)}</td><td>${c.last?new Date(c.last).toLocaleDateString('en-IN'):'—'}</td></tr>`).join('');
+ body.innerHTML=customerCache.map(c=>`<tr><td><b>${esc(c.phone)}</b></td><td>${esc(c.name||'—')}</td><td>${esc(c.dob||'—')}</td><td>${c.count}</td><td>${money(c.total)}</td><td>${c.last?new Date(c.last).toLocaleDateString('en-IN'):'—'}</td></tr>`).join('');
 }
 function exportCustomersExcel(){
  if(!customerCache.length){toast('No customers to export');return}
  if(typeof XLSX==='undefined'){toast('Excel library not loaded');return}
  const rows=customerCache.map(c=>({
   'Phone Number':c.phone,
+  'Name':c.name||'',
+  'DOB':c.dob||'',
   'Total Bills':c.count,
   'Total Spent':c.total,
   'Last Purchase':c.last?new Date(c.last).toLocaleDateString('en-IN'):'',
@@ -524,9 +530,24 @@ async function completeSale(){
    const v=variants.find(x=>x.id===c.id);if(!v||c.qty>v.stock_quantity)throw Error('Stock changed for an item. Refresh and try again.');
    const line=Number(v.selling_price)*c.qty;subtotal+=line;items.push({v,c,line});
   }
-  const phone=document.getElementById('customerPhone').value.trim();let customer_id=null;
-  if(phone){let r=await db.from('customers').select('id').eq('phone',phone).limit(1).maybeSingle();if(r.error)throw r.error;if(r.data)customer_id=r.data.id;else{r=await db.from('customers').insert({phone}).select('id').single();if(r.error)throw r.error;customer_id=r.data.id}}
-  const r=await db.from('bills').insert({bill_number:billNumber,customer_id,subtotal,total:subtotal,payment_method:document.getElementById('payment').value,status:'completed'}).select().single();if(r.error)throw r.error;
+  const phone=document.getElementById('customerPhone').value.trim();
+  const customerName=document.getElementById('customerName').value.trim();
+  const customerDob=document.getElementById('customerDob').value.trim();
+  const salesman=document.getElementById('salesman').value;
+  let customer_id=null;
+  if(phone){
+   let r=await db.from('customers').select('id,name,date_of_birth').eq('phone',phone).limit(1).maybeSingle();if(r.error)throw r.error;
+   if(r.data){
+    customer_id=r.data.id;
+    const patch={};
+    if(customerName && !r.data.name)patch.name=customerName;
+    if(customerDob && !r.data.date_of_birth)patch.date_of_birth=customerDob;
+    if(Object.keys(patch).length){const ur=await db.from('customers').update(patch).eq('id',customer_id);if(ur.error)throw ur.error}
+   }else{
+    r=await db.from('customers').insert({phone,name:customerName||null,date_of_birth:customerDob||null}).select('id').single();if(r.error)throw r.error;customer_id=r.data.id;
+   }
+  }
+  const r=await db.from('bills').insert({bill_number:billNumber,customer_id,subtotal,total:subtotal,payment_method:document.getElementById('payment').value,salesman:salesman||null,status:'completed'}).select().single();if(r.error)throw r.error;
   for(const x of items){
    if(x.adhoc){
     const c=x.c;const productName=(c.brand?c.brand+' - ':'')+c.name;
@@ -538,7 +559,7 @@ async function completeSale(){
    rr=await db.from('product_variants').update({stock_quantity:Number(v.stock_quantity)-x.c.qty}).eq('id',v.id).eq('stock_quantity',v.stock_quantity);if(rr.error)throw rr.error;
    await db.from('inventory_movements').insert({variant_id:v.id,movement_type:'sale',quantity:-x.c.qty,reference_id:r.data.id,notes:`Bill ${billNumber}`});
   }
-  toast(`Bill ${billNumber} completed`);cart=[];document.getElementById('customerPhone').value='';await loadData();renderCart();
+  toast(`Bill ${billNumber} completed`);cart=[];document.getElementById('customerPhone').value='';document.getElementById('customerName').value='';document.getElementById('customerDob').value='';document.getElementById('salesman').value='';await loadData();renderCart();
   // Print immediately after the bill has been committed and the fresh sales cache is loaded.
   if(autoPrintWindow){
    await printBill(r.data.id, autoPrintWindow);
@@ -747,15 +768,15 @@ function filteredSales(){
 
 async function renderSales(){
  setDefaultSalesDates();
- const {data,error}=await db.from('bills').select('id,bill_number,created_at,payment_method,total,status,bill_items(quantity,product_name,size,colour,sku,barcode,selling_price,line_total)').order('created_at',{ascending:false}).limit(1000);
- if(error){document.getElementById('salesRows').innerHTML=`<tr><td colspan="6" class="empty">${esc(error.message)}</td></tr>`;return}
+ const {data,error}=await db.from('bills').select('id,bill_number,created_at,payment_method,total,status,salesman,bill_items(quantity,product_name,size,colour,sku,barcode,selling_price,line_total)').order('created_at',{ascending:false}).limit(1000);
+ if(error){document.getElementById('salesRows').innerHTML=`<tr><td colspan="7" class="empty">${esc(error.message)}</td></tr>`;return}
  salesCache=data||[];
  const rows=filteredSales();
  renderSalesInsights(rows);renderChampions(rows);renderDuffers(rows);
  document.getElementById('salesRows').innerHTML=rows.map(b=>{
    const qty=(b.bill_items||[]).reduce((s,i)=>s+Number(i.quantity||0),0);
-   return `<tr><td><b>${esc(b.bill_number)}</b></td><td>${new Date(b.created_at).toLocaleString('en-IN')}</td><td>${qty}</td><td><span class="pill">${esc(b.payment_method)}</span></td><td>${money(b.total)}</td><td><div class="actions"><button class="btn secondary" style="padding:6px 9px" onclick="toggleSaleDetails('${b.id}')">View</button><button class="btn secondary" style="padding:6px 9px" onclick="printBill('${b.id}')">Print</button><button class="btn danger" style="padding:6px 9px" onclick="deleteBill('${b.id}')">Delete</button></div></td></tr><tr id="sale-detail-${b.id}" style="display:none"><td colspan="6" style="background:#fbf6ea"><div style="padding:4px 6px"><b>Articles sold</b>${renderBillItemsDetail(b)}</div></td></tr>`;
- }).join('')||`<tr><td colspan="6" class="empty">No sales found for the selected period.</td></tr>`;
+   return `<tr><td><b>${esc(b.bill_number)}</b></td><td>${new Date(b.created_at).toLocaleString('en-IN')}</td><td>${qty}</td><td><span class="pill">${esc(b.payment_method)}</span></td><td>${esc(b.salesman||'—')}</td><td>${money(b.total)}</td><td><div class="actions"><button class="btn secondary" style="padding:6px 9px" onclick="toggleSaleDetails('${b.id}')">View</button><button class="btn secondary" style="padding:6px 9px" onclick="printBill('${b.id}')">Print</button><button class="btn danger" style="padding:6px 9px" onclick="deleteBill('${b.id}')">Delete</button></div></td></tr><tr id="sale-detail-${b.id}" style="display:none"><td colspan="7" style="background:#fbf6ea"><div style="padding:4px 6px"><b>Articles sold</b>${renderBillItemsDetail(b)}</div></td></tr>`;
+ }).join('')||`<tr><td colspan="7" class="empty">No sales found for the selected period.</td></tr>`;
 }
 
 function renderBillItemsDetail(b){
@@ -827,7 +848,7 @@ function exportSalesExcel(){
  if(!rows.length){toast('No sales to export');return}
  if(typeof XLSX==='undefined'){toast('Excel library not loaded');return}
  const sales=[];
- rows.forEach(b=>(b.bill_items||[]).forEach(i=>sales.push({Bill:b.bill_number,Date:new Date(b.created_at).toLocaleString('en-IN'),Payment:b.payment_method,Article:i.product_name,Size:i.size||'',Colour:i.colour||'',SKU:i.sku||'',Barcode:i.barcode||'',Quantity:Number(i.quantity||0),'Selling Price':Number(i.selling_price||0),'Line Total':Number(i.line_total||0)})));
+ rows.forEach(b=>(b.bill_items||[]).forEach(i=>sales.push({Bill:b.bill_number,Date:new Date(b.created_at).toLocaleString('en-IN'),Payment:b.payment_method,Salesman:b.salesman||'',Article:i.product_name,Size:i.size||'',Colour:i.colour||'',SKU:i.sku||'',Barcode:i.barcode||'',Quantity:Number(i.quantity||0),'Selling Price':Number(i.selling_price||0),'Line Total':Number(i.line_total||0)})));
  const champs=championData(rows).map((x,i)=>({Rank:i+1,Article:x.name,Size:x.size,Colour:x.colour,SKU:x.sku,Barcode:x.barcode,'Units Sold':x.units,Revenue:x.revenue}));
  const duffers=dufferData(rows).map((x,i)=>({Rank:i+1,Article:x.name,Size:x.size,Colour:x.colour,SKU:x.sku,Barcode:x.barcode,'Stock Left':x.stock,'Units Sold':x.units,Revenue:x.revenue}));
  const summary=[{Metric:'Total Sales',Value:rows.reduce((s,b)=>s+Number(b.total||0),0)},{Metric:'Bills',Value:rows.length},{Metric:'Units Sold',Value:sales.reduce((s,x)=>s+x.Quantity,0)},{Metric:'Average Bill',Value:rows.length?rows.reduce((s,b)=>s+Number(b.total||0),0)/rows.length:0},{Metric:'Champion Product',Value:champs[0]?.Article||'—'},{Metric:'Champion Size',Value:champs[0]?.Size||'—'},{Metric:'Champion Colour',Value:champs[0]?.Colour||'—'},{Metric:'Duffer Product',Value:duffers[0]?.Article||'—'},{Metric:'Duffer Size',Value:duffers[0]?.Size||'—'},{Metric:'Duffer Stock Left',Value:duffers[0]?.['Stock Left']||0}];
