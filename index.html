@@ -59,8 +59,8 @@ button,input,select{font:inherit}button{cursor:pointer}.app{display:flex;min-hei
 </section>
 
 <section id="inventory" class="view">
- <div class="top"><div><h1>Inventory</h1><div class="date">Stock by size and colour</div></div><button class="btn" onclick="openStockModal()">+ Add Stock</button></div>
- <div class="panel"><div class="table-wrap"><table class="table"><thead><tr><th>Article</th><th>Size</th><th>Colour</th><th>SKU</th><th>Barcode</th><th>Stock</th><th>Reorder</th></tr></thead><tbody id="inventoryRows"></tbody></table></div></div>
+ <div class="top"><div><h1>Inventory</h1><div class="date">Stock by size and colour</div></div><div style="display:flex;gap:10px"><button class="btn danger" onclick="deleteSelectedInventory()">Delete Selected</button><button class="btn" onclick="openStockModal()">+ Add Stock</button></div></div>
+ <div class="panel"><div class="table-wrap"><table class="table"><thead><tr><th><input type="checkbox" onchange="toggleSelectAllInventory(this)"></th><th>Article</th><th>Size</th><th>Colour</th><th>SKU</th><th>Barcode</th><th>Stock</th><th>Reorder</th></tr></thead><tbody id="inventoryRows"></tbody></table></div></div>
 </section>
 
 <section id="billing" class="view">
@@ -149,7 +149,7 @@ button,input,select{font:inherit}button{cursor:pointer}.app{display:flex;min-hei
   <div class="grid">
    <div><label>Article name *</label><input id="pName" required placeholder="e.g. Slim Fit Jeans"></div>
    <div><label>Category</label><select id="pCategory"><option>Formal Shirts</option><option>Casual Shirts</option><option>T-Shirt</option><option>Polo T-Shirts</option><option>Sweaters</option><option>Hoodie</option><option>Jackets</option><option>Jeans</option><option>Formal Pants</option><option>Casual Pants</option><option>Cargo Pants</option><option>Travel Pants</option><option>Gym Wear (Shorts)</option><option>Gym Wear (Lowers)</option><option>Vests</option><option>Briefs</option></select></div>
-   <div><label>Brand</label><input id="pBrand" placeholder="Brand"></div>
+   <div><label>Brand</label><input id="pBrand" list="brandList" placeholder="Type to search or add a brand" autocomplete="off"><datalist id="brandList"></datalist></div>
    <div><label>Size</label><input id="pSize" placeholder="e.g. 32 / M / XL"></div>
    <div><label>Colour</label><input id="pColour" placeholder="e.g. Blue"></div>
    <div><label>SKU</label><input id="pSku" placeholder="Optional"></div>
@@ -378,7 +378,30 @@ function renderProducts(){
  document.getElementById('productRows').innerHTML=rows.length?rows.map(v=>`<tr><td><input type="checkbox" class="printSelect" value="${v.id}"></td><td><input type="number" class="printQty" data-id="${v.id}" value="1" min="1" style="width:48px"></td><td><b>${esc(v.products?.name||'')}</b><div class="hint">${esc(v.products?.category||'')}</div></td><td>${esc(v.size||'—')} / ${esc(v.colour||'—')}</td><td>${esc(v.sku||'—')}</td><td>${esc(v.barcode||'—')}</td><td>${money(v.mrp)}</td><td>${money(v.selling_price)}</td><td>${Number(v.stock_quantity)}</td><td><div class="actions" style="flex-wrap:wrap"><button class="btn secondary" style="padding:6px 9px" onclick="generateBarcode('${v.id}')">${v.barcode?'Print':'Generate'}</button><button class="btn secondary" style="padding:6px 9px" onclick="printMRPLabel('${v.id}')">MRP Tag</button></div></td><td><button class="btn danger" style="padding:6px 9px" onclick="deleteVariant('${v.id}')">Delete</button></td></tr>`).join(''):`<tr><td colspan="11" class="empty">No products yet. Click + Add Product.</td></tr>`;
 }
 function renderInventory(){
- document.getElementById('inventoryRows').innerHTML=variants.length?variants.map(v=>`<tr><td><b>${esc(v.products?.name||'')}</b></td><td>${esc(v.size||'—')}</td><td>${esc(v.colour||'—')}</td><td>${esc(v.sku||'—')}</td><td>${esc(v.barcode||'—')}</td><td class="${Number(v.stock_quantity)<=Number(v.reorder_level)?'low':''}">${v.stock_quantity}</td><td>${v.reorder_level}</td></tr>`).join(''):`<tr><td colspan="7" class="empty">No inventory yet.</td></tr>`;
+ document.getElementById('inventoryRows').innerHTML=variants.length?variants.map(v=>`<tr><td><input type="checkbox" class="invSelect" value="${v.id}"></td><td><b>${esc(v.products?.name||'')}</b></td><td>${esc(v.size||'—')}</td><td>${esc(v.colour||'—')}</td><td>${esc(v.sku||'—')}</td><td>${esc(v.barcode||'—')}</td><td class="${Number(v.stock_quantity)<=Number(v.reorder_level)?'low':''}">${v.stock_quantity}</td><td>${v.reorder_level}</td></tr>`).join(''):`<tr><td colspan="8" class="empty">No inventory yet.</td></tr>`;
+}
+function toggleSelectAllInventory(cb){document.querySelectorAll('.invSelect').forEach(c=>c.checked=cb.checked)}
+async function deleteSelectedInventory(){
+ const ids=[...document.querySelectorAll('.invSelect:checked')].map(c=>c.value);
+ if(!ids.length){toast('Tick at least one item first');return}
+ if(!confirm(`Delete ${ids.length} selected item(s)? This cannot be undone. Any linked sales history for these items will also be permanently removed.`))return;
+ let done=0;
+ for(const id of ids){
+  const v=variants.find(x=>x.id===id);
+  let {error}=await db.from('product_variants').delete().eq('id',id);
+  if(error){
+   await db.from('bill_items').delete().eq('variant_id',id);
+   await db.from('inventory_movements').delete().eq('variant_id',id);
+   ({error}=await db.from('product_variants').delete().eq('id',id));
+  }
+  if(error)continue;
+  done++;
+  if(v?.product_id){
+   const {data:remaining}=await db.from('product_variants').select('id').eq('product_id',v.product_id).limit(1);
+   if(!remaining||!remaining.length)await db.from('products').delete().eq('id',v.product_id);
+  }
+ }
+ toast(`${done} item(s) deleted`);await loadData();
 }
 async function generateNewProductBarcode(){
   // POSHAK internal CODE128 barcode: 200 + 9 random digits
@@ -399,6 +422,16 @@ async function saveProduct(e){
  const name=document.getElementById('pName').value.trim(),category=document.getElementById('pCategory').value,brand=document.getElementById('pBrand').value.trim();
  const size=document.getElementById('pSize').value.trim(),colour=document.getElementById('pColour').value.trim(),sku=document.getElementById('pSku').value.trim()||null,barcode=document.getElementById('pBarcode').value.trim()||null;
  const mrp=Number(document.getElementById('pMrp').value),sell=Number(document.getElementById('pSell').value),stock=Number(document.getElementById('pStock').value||0),reorder=Number(document.getElementById('pReorder').value||5);
+ // Same article name + size + colour already exists — add to its stock instead
+ // of creating a second, duplicate entry.
+ const dup=variants.find(v=>(v.products?.name||'').trim().toLowerCase()===name.toLowerCase() && (v.size||'').trim().toLowerCase()===size.toLowerCase() && (v.colour||'').trim().toLowerCase()===colour.toLowerCase());
+ if(dup){
+  const {error:ue}=await db.from('product_variants').update({stock_quantity:Number(dup.stock_quantity)+stock}).eq('id',dup.id);
+  if(ue){toast(ue.message);return}
+  if(stock)await db.from('inventory_movements').insert({variant_id:dup.id,movement_type:'opening_stock',quantity:stock,notes:'Added via duplicate Add Product (merged)'});
+  closeModal('productModal');e.target.reset();document.getElementById('pStock').value=0;document.getElementById('pReorder').value=5;
+  toast(`This item already exists — added ${stock} to its existing stock instead of a duplicate`);await loadData();return;
+ }
  const {data:p,error:pe}=await db.from('products').insert({name,category,brand}).select().single();
  if(pe){toast(pe.message);return}
  const {data:v,error:ve}=await db.from('product_variants').insert({product_id:p.id,sku,barcode,size,colour,mrp,selling_price:sell,stock_quantity:stock,reorder_level:reorder}).select().single();
@@ -870,7 +903,9 @@ async function doLogin(e){
  showApp();
 }
 async function logout(){await db.auth.signOut();showLogin()}
-function showApp(){document.getElementById('loginScreen').classList.remove('show');document.getElementById('appRoot').style.display='flex';loadData()}
+const BRAND_LIST=['ZARA D','ZARA R','US POLO','H&M','LOUIS VUITTON','BURBERRY','AMIRI','LEVIES ORIGNAL','LEVIES PREMIUM','LEVIES STRAUSS','TOMMY HILFIGER','BELENCIAGA','AMERICAN STUFFED','BOTABOCHI','DIOR','VERSACE','D&G','AMERICAN EAGLE','RALF LAUREN','GANT','BLACK BULL','MXM.CLUB','G-STAR RAW','GO.JNS.COM','DIESEL','TRUE RELIGION','JACK &JONES','PARADA','BALMAIN','CHROME HEART','KARL LAGERFELD','GORGEOUS','CALVIN KLEIN','ARMANI JEANS','JEANS CULTURE','GAS','FUNK'];
+function populateBrandList(){document.getElementById('brandList').innerHTML=BRAND_LIST.map(b=>`<option value="${esc(b)}">`).join('')}
+function showApp(){document.getElementById('loginScreen').classList.remove('show');document.getElementById('appRoot').style.display='flex';populateBrandList();loadData()}
 function showLogin(){document.getElementById('appRoot').style.display='none';document.getElementById('loginScreen').classList.add('show')}
 async function initAuth(){
  const {data:{session}}=await db.auth.getSession();
