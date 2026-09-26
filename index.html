@@ -654,12 +654,14 @@ function tsplBuildJob(rows){
   items.forEach((it,idx)=>{
    if(!it)return;
    const xOff=idx===0?24:424; // dots (203dpi, 8 dots/mm): panel 0 and panel 1 (50mm=400 dots) + small pad
-   let y=16;
+   let y=14;
    cmd+=`TEXT ${xOff},${y},"3",0,1,1,"${tsplEscape(it.name)}"\r\n`;
-   y+=28;
-   cmd+=`TEXT ${xOff},${y},"1",0,1,1,"${tsplEscape(it.meta)}"\r\n`;
-   y+=24;
-   if(it.mrpBig)cmd+=`TEXT ${xOff},${y+6},"4",0,1,1,"MRP ${tsplEscape(it.mrpBig)}"\r\n`;
+   y+=26;
+   if(it.meta){cmd+=`TEXT ${xOff},${y},"1",0,1,1,"${tsplEscape(it.meta)}"\r\n`;y+=22}
+   // MRP printed on its own line, larger font, and as "Rs" (not the ₹ symbol —
+   // the printer's built-in TSPL fonts don't have that glyph and print garbage instead).
+   if(it.mrpLine){cmd+=`TEXT ${xOff},${y},"3",0,1,1,"${tsplEscape(it.mrpLine)}"\r\n`;y+=28}
+   if(it.mrpBig){cmd+=`TEXT ${xOff},${y+4},"4",0,1,1,"MRP ${tsplEscape(it.mrpBig)}"\r\n`;y+=32}
    if(it.barcode)cmd+=`BARCODE ${xOff},${y},"128",40,1,0,2,2,"${tsplEscape(it.barcode)}"\r\n`;
   });
   cmd+='PRINT 1,1\r\n';
@@ -674,8 +676,9 @@ async function printViaBridge(cells){
  const res=await fetch(PRINT_BRIDGE_URL+'/print',{method:'POST',headers:{'Content-Type':'text/plain'},body:tspl});
  if(!res.ok)throw new Error('bridge print failed');
 }
-function barcodeCellData(v){return {name:v.products?.name||'POSHAK Product',meta:[v.size,v.colour].filter(Boolean).join(' / ')+' · MRP '+money(v.mrp),barcode:v.barcode}}
-function mrpCellData(v){return {name:v.products?.name||'',meta:[v.size,v.colour].filter(Boolean).join(' / '),mrpBig:money(v.mrp)}}
+function moneyTspl(n){return 'Rs '+Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function barcodeCellData(v){return {name:v.products?.name||'POSHAK Product',meta:[v.size,v.colour].filter(Boolean).join(' / '),mrpLine:moneyTspl(v.mrp),barcode:v.barcode}}
+function mrpCellData(v){return {name:v.products?.name||'',meta:[v.size,v.colour].filter(Boolean).join(' / '),mrpBig:moneyTspl(v.mrp)}}
 
 // ---- shared 2-panel (100mm x 25mm) label print engine ----
 // The physical roll is 100mm wide with a die-cut down the middle: two 50mm
